@@ -87,11 +87,17 @@ namespace audio {
   // NOLINTNEXTLINE
   template <AudioSubscriber... Subscribers> struct AudioInputBuilder {
     std::unique_ptr<AVDictionary, decltype(_avDictionaryDeleter)> options;
+    std::tuple<Subscribers...> subs;
+    std::string_view device_url;
+    std::string_view input_format;
 
-    auto setOption(auto&& key, auto&& value);
-
-    AudioInputBuilder();
+    AudioInputBuilder(Subscribers&&... subscribers);
     ~AudioInputBuilder();
+
+    auto setOption(auto &&key, auto &&value) -> AudioInputBuilder &;
+    auto setDeviceUrl(auto &&value) -> AudioInputBuilder &;
+    auto setInputFormat(auto&& value) -> AudioInputBuilder &;
+    auto build() -> AudioInput<Subscribers...>;
   };
 
   

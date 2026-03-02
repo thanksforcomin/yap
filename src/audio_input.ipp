@@ -48,5 +48,41 @@ namespace audio {
   }
 
   template <AudioSubscriber... Subscribers>
-  AudioInputBuilder::AudioInputBuilder() : options()
+  AudioInputBuilder<Subscribers...>::AudioInputBuilder(
+      Subscribers &&...subscribers)
+      : options(), subs(std::forward<Subscribers>(subscribers)...) {}
+
+  template <AudioSubscriber... Subscribers>
+  auto AudioInputBuilder<Subscribers...>::setOption(auto &&key, auto &&value)
+      -> AudioInputBuilder & {
+    auto opts = options.get();
+    av_dict_set(&opts, key, value, 0);
+
+    return *this;
+  }
+
+  template <AudioSubscriber... Subscribers>
+  auto AudioInputBuilder<Subscribers...>::setDeviceUrl(auto &&value)
+      -> AudioInputBuilder & {
+    device_url = value;
+    
+    return *this;
+  }
+  
+  template <AudioSubscriber... Subscribers>
+  auto AudioInputBuilder<Subscribers...>::setInputFormat(auto &&value)
+      -> AudioInputBuilder & {
+    input_format = value;
+    
+    return *this;
+  }
+  
+  template <AudioSubscriber... Subscribers>
+  auto AudioInputBuilder<Subscribers...>::build()
+      -> AudioInput<Subscribers...> {
+    return std::apply([&](Subscribers &&...subscribers) {
+      return AudioInput(options, device_url, input_format,
+                        std::forward<Subscribers>(subscribers)...);
+    });
+  }
 }
