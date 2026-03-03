@@ -9,11 +9,10 @@ namespace audio {
   template <AudioSubscriber... Subscribers>
   AudioInput<Subscribers...>::AudioInput(auto &&options, auto &&device_url,
                                          auto &&input_format_name,
-                                         Subscribers &&...subscribers)
-    : subscribers(std::forward<Subscribers>(subscribers)...),
+                                         Subscribers &...subscribers)
+    : subscribers(std::tie(subscribers...)),
       fmt_ctx_ptr(*makeInput(options, device_url, input_format_name)),
       audio_index(-1) {
-
     if (!setup()) {
       utils::report_error("Cannot build audio input");
     }
@@ -52,7 +51,7 @@ namespace audio {
       return std::unexpected(CannotFindStreamInfo);
     }
 
-    for (int32_t i = 0; i < fmt_ctx_ptr->nb_streams; ++i) {
+    for (int32_t i = 0; i < static_cast<int>(fmt_ctx_ptr->nb_streams); ++i) {
       if (fmt_ctx_ptr->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
         audio_index = i;
         break;
@@ -63,6 +62,8 @@ namespace audio {
       utils::report_error("No audio stream found");
       return std::unexpected(NoAudioStreamFound);
     }
+
+    return {};
   }
 
   template <AudioSubscriber... Subscribers>
@@ -81,15 +82,17 @@ namespace audio {
       }
 
       if (pack.pack.stream_index == audio_index) {
-        std::println("Got audio packet, size: {}", pack.pack.size);
+        std::apply([&](Subscribers&... subs) {
+          (subs.process(pack),...);
+        }, subscribers);
       }
     }
   }
 
   template <AudioSubscriber... Subscribers>
   AudioInputBuilder<Subscribers...>::AudioInputBuilder(
-      Subscribers &&...subscribers)
-      : options(), subs(std::forward<Subscribers>(subscribers)...) {}
+      Subscribers &...subscribers)
+    : options(), subs(std::tie(subscribers...)) {}
 
   template <AudioSubscriber... Subscribers>
   auto AudioInputBuilder<Subscribers...>::setOption(auto &&key, auto &&value)
@@ -119,9 +122,9 @@ namespace audio {
   template <AudioSubscriber... Subscribers>
   auto AudioInputBuilder<Subscribers...>::build()
       -> AudioInput<Subscribers...> {
-    return std::apply([&](Subscribers &&...subscribers) {
+    return std::apply([&](Subscribers &...subscribers) {
       return AudioInput(options.get(), device_url.data(), input_format.data(),
-                        std::forward<Subscribers>(subscribers)...);
+                        subscribers...);
     }, subs);
   }
 }

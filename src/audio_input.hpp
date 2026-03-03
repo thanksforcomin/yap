@@ -43,7 +43,7 @@ namespace audio {
 
   template <typename T>
   concept AudioSubscriber = requires(T t, PacketWrapper packet) {
-    { t.process(std::move(packet)) } -> std::same_as<void>;
+    { t.process(packet) } -> std::same_as<void>;
   };
 
   inline constexpr auto _formatContextDeleter = [](AVFormatContext *ctx) {
@@ -52,7 +52,7 @@ namespace audio {
   };
   
   template <AudioSubscriber... Subscribers> class AudioInput {
-    std::tuple<Subscribers...> subscribers;
+    std::tuple<Subscribers&...> subscribers;
 
     std::unique_ptr<AVFormatContext, decltype(_formatContextDeleter)>
         fmt_ctx_ptr;
@@ -60,7 +60,7 @@ namespace audio {
     
   public:
     AudioInput(auto&& options, auto &&device_url, auto &&input_format_name,
-               Subscribers &&...subscribers);
+               Subscribers &...subscribers);
 
     AudioInput(const AudioInput &) = delete;
     auto operator=(const AudioInput &) -> AudioInput & = delete;
@@ -68,7 +68,7 @@ namespace audio {
     AudioInput(AudioInput &&other);
     auto operator=(AudioInput &&other) -> AudioInput &;
 
-    ~AudioInput();
+    ~AudioInput() = default;
 
     auto run() -> void;
 
@@ -88,12 +88,12 @@ namespace audio {
   // NOLINTNEXTLINE
   template <AudioSubscriber... Subscribers> struct AudioInputBuilder {
     std::unique_ptr<AVDictionary, decltype(_avDictionaryDeleter)> options;
-    std::tuple<Subscribers...> subs;
+    std::tuple<Subscribers&...> subs;
     std::string_view device_url;
     std::string_view input_format;
 
-    AudioInputBuilder(Subscribers&&... subscribers);
-    ~AudioInputBuilder();
+    AudioInputBuilder(Subscribers&... subscribers);
+    ~AudioInputBuilder() = default;
 
     auto setOption(auto &&key, auto &&value) -> AudioInputBuilder &;
     auto setDeviceUrl(auto &&value) -> AudioInputBuilder &;
@@ -101,3 +101,5 @@ namespace audio {
     auto build() -> AudioInput<Subscribers...>;
   };
 }
+
+#include "audio_input.ipp"

@@ -8,3 +8,4 @@ namespace audio {
 
   PacketWrapper::~PacketWrapper() { av_packet_unref(&pack); }
 }
+
