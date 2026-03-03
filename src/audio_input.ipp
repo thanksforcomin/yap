@@ -16,6 +16,13 @@ namespace audio {
     if (!setup()) {
       utils::report_error("Cannot build audio input");
     }
+
+    AudioInputInfo info {
+      .input_params = fmt_ctx_ptr->streams[audio_index]->codecpar;
+    };
+    
+    std::apply([&](Subscribers &...subs) { (subs.updateAudioInfo(info), ...); },
+               this->subscribers);
   }
 
   template <AudioSubscriber... Subscribers>

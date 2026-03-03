@@ -8,6 +8,7 @@
 #include <type_traits>
 
 #include "audio_input.hpp"
+#include "processing.hpp"
 
 extern "C" {
 #include <libavdevice/avdevice.h>
@@ -22,6 +23,10 @@ struct PrimitiveLogger {
     std::println("Received audio packet of size {}", wrappa.pack.size);
   }
 
+  void updateAudioInfo(const audio::AudioInputInfo &info) {
+    std::println("Received audio info");
+  }
+  
   PrimitiveLogger() = default;
 
   PrimitiveLogger(const PrimitiveLogger &other) = delete;
@@ -38,10 +43,14 @@ int main() {
   avdevice_register_all();
   avformat_network_init();
 
-  auto audio_input = audio::AudioInputBuilder(logger)
+  proc::OpusCodec codec;
+
+  auto audio_input = audio::AudioInputBuilder(logger, codec)
                          .setInputFormat("pulse")
                          .setDeviceUrl("default")
                          .build();
+
+  codec = proc::OpusCodec();
 
   audio_input.run();
 };
