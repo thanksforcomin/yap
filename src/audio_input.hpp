@@ -1,13 +1,5 @@
 #pragma once
 
-#include "src/utils.hpp"
-#include <expected>
-#include <libavcodec/packet.h>
-#include <libavutil/channel_layout.h>
-#include <memory>
-#include <mutex>
-#include <tuple>
-#include <unordered_map>
 extern "C" {
 #include <libavdevice/avdevice.h>
 #include <libavformat/avformat.h>
@@ -15,6 +7,13 @@ extern "C" {
 #include <libavutil/dict.h>
 #include <libavutil/error.h>
 }
+
+#include "src/utils.hpp"
+#include <expected>
+#include <memory>
+#include <mutex>
+#include <tuple>
+#include <unordered_map>
 
 namespace audio {
 
@@ -55,7 +54,9 @@ namespace audio {
   template <AudioSubscriber... Subscribers> class AudioInput {
     std::tuple<Subscribers...> subscribers;
 
-    std::unique_ptr<AVFormatContext, decltype(_formatContextDeleter)> fmt_ctx_ptr;
+    std::unique_ptr<AVFormatContext, decltype(_formatContextDeleter)>
+        fmt_ctx_ptr;
+    int32_t audio_index;
     
   public:
     AudioInput(auto&& options, auto &&device_url, auto &&input_format_name,
@@ -72,11 +73,11 @@ namespace audio {
     auto run() -> void;
 
   private:
-    auto makeInput(utils::formattable auto &&device_url,
+    auto makeInput(AVDictionary *options, utils::formattable auto &&device_url,
                    utils::formattable auto &&input_format_name)
         -> Result<AVFormatContext *>;
 
-    auto setOptions(AVDictionary *options) -> void;
+    auto setup() -> Result<void>;
   };
 
   inline constexpr auto _avDictionaryDeleter = [](AVDictionary *dict) {
@@ -99,7 +100,4 @@ namespace audio {
     auto setInputFormat(auto&& value) -> AudioInputBuilder &;
     auto build() -> AudioInput<Subscribers...>;
   };
-
-  
-  
 }

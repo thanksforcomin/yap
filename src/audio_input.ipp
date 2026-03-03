@@ -2,8 +2,8 @@
 
 #include "audio_input.hpp"
 #include "src/utils.hpp"
-#include <libavformat/avformat.h>
-#include <libavutil/dict.h>
+#include <cerrno>
+#include <print>
 
 namespace audio {
   template <AudioSubscriber... Subscribers>
@@ -11,40 +11,79 @@ namespace audio {
                                          auto &&input_format_name,
                                          Subscribers &&...subscribers)
     : subscribers(std::forward<Subscribers>(subscribers)...),
-      fmt_ctx_ptr(nullptr) {}
-  
+      fmt_ctx_ptr(*makeInput(options, device_url, input_format_name)),
+      audio_index(-1) {
+
+    if (!setup()) {
+      utils::report_error("Cannot build audio input");
+    }
+  }
+
   template <AudioSubscriber... Subscribers>
   auto AudioInput<Subscribers...>::makeInput(
-      utils::formattable auto &&device_url,
+      AVDictionary *options, utils::formattable auto &&device_url,
       utils::formattable auto &&input_format_name)
       -> Result<AVFormatContext *> {
-    AVInputFormat *input_format = av_find_input_format(input_format_name);
+    AVInputFormat *input_format =
+        const_cast<AVInputFormat *>(av_find_input_format(input_format_name));
     
     if (!input_format) {
-      utils::report_error("Unknown input format: {}", input_format_name);
+      utils::report_error(std::format("Unknown input format: {}", input_format_name));
       return std::unexpected(UnknownInputFormat);
     }
 
     AVFormatContext *fmt_context = nullptr;
-    AVDictionary *options = nullptr;
-
-    setOptions(options);
 
     if (auto ret = avformat_open_input(&fmt_context, device_url,
-                                       input_format_name, &options);
+                                       input_format, &options);
         ret < 0) {
       utils::report_error(ret, "Failed to open device");
       return std::unexpected(FailedToOpenDevice);
     }
-
+    
     return fmt_context;
   }
 
-  // sample here, we need to actually store them in some dictionary
   template <AudioSubscriber... Subscribers>
-  auto AudioInput<Subscribers...>::setOptions(AVDictionary *options)
-      -> void {
-    av_dict_set(&options, "sample_rate", "44100", 0);
+  auto AudioInput<Subscribers...>::setup() -> Result<void> {
+    if (auto ret = avformat_find_stream_info(fmt_ctx_ptr.get(), nullptr);
+        ret < 0) {
+      utils::report_error("Could not find stream info");
+      return std::unexpected(CannotFindStreamInfo);
+    }
+
+    for (int32_t i = 0; i < fmt_ctx_ptr->nb_streams; ++i) {
+      if (fmt_ctx_ptr->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+        audio_index = i;
+        break;
+      }
+    }
+
+    if (audio_index == -1) {
+      utils::report_error("No audio stream found");
+      return std::unexpected(NoAudioStreamFound);
+    }
+  }
+
+  template <AudioSubscriber... Subscribers>
+  auto AudioInput<Subscribers...>::run() -> void {
+    std::println("Capturing audio... Press Ctrl+C to abort");
+
+    PacketWrapper pack;
+
+    while (true) {
+      if (auto ret = av_read_frame(fmt_ctx_ptr.get(), &pack.pack); ret < 0) {
+        if (ret == AVERROR_EOF || ret == AVERROR(EAGAIN))
+          break;
+
+        utils::report_error(ret, "Error reading frame: ");
+        break;
+      }
+
+      if (pack.pack.stream_index == audio_index) {
+        std::println("Got audio packet, size: {}", pack.pack.size);
+      }
+    }
   }
 
   template <AudioSubscriber... Subscribers>
@@ -81,8 +120,8 @@ namespace audio {
   auto AudioInputBuilder<Subscribers...>::build()
       -> AudioInput<Subscribers...> {
     return std::apply([&](Subscribers &&...subscribers) {
-      return AudioInput(options, device_url, input_format,
+      return AudioInput(options.get(), device_url.data(), input_format.data(),
                         std::forward<Subscribers>(subscribers)...);
-    });
+    }, subs);
   }
 }

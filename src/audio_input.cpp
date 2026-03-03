@@ -7,7 +7,4 @@ namespace audio {
   }
 
   PacketWrapper::~PacketWrapper() { av_packet_unref(&pack); }
-
-  template <AudioSubscriber... Subscribers>
-  AudioInput::AudioInput(Subscribers &&...subscribers)
 }

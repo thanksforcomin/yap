@@ -5,6 +5,14 @@
 #include <type_traits>
 #include <print>
 
+extern "C" {
+#include <libavdevice/avdevice.h>
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
+#include <libavutil/dict.h>
+#include <libavutil/error.h>
+}
+
 namespace utils {
 template <typename T>
 concept integral = std::integral<std::remove_reference_t<T>>;
@@ -19,10 +27,10 @@ concept integral = std::integral<std::remove_reference_t<T>>;
   void report_error(utils::integral auto&& code, utils::formattable auto&& message) {
     static std::array<char, 128> errbuf;
     av_strerror(code, errbuf.data(), sizeof(errbuf));
-    std::println("{}: {}", message, errbuf.data());
+    std::println("ERROR: {}: {}", message, errbuf.data());
   }
   
   void report_error(utils::formattable auto &&message) {
-    std::print("{}", message);
+    std::print("ERROR: {}", message);
   }
 }
