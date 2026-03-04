@@ -23,10 +23,6 @@ struct PrimitiveLogger {
     std::println("Received audio packet of size {}", wrappa.pack.size);
   }
 
-  void updateAudioInfo(const audio::AudioInputInfo &info) {
-    std::println("Received audio info");
-  }
-  
   PrimitiveLogger() = default;
 
   PrimitiveLogger(const PrimitiveLogger &other) = delete;
@@ -43,14 +39,10 @@ int main() {
   avdevice_register_all();
   avformat_network_init();
 
-  proc::OpusCodec codec;
-
-  auto audio_input = audio::AudioInputBuilder(logger, codec)
+  auto audio_input = audio::AudioInputBuilder(logger)
                          .setInputFormat("pulse")
                          .setDeviceUrl("default")
                          .build();
-
-  codec = proc::OpusCodec();
 
   audio_input.run();
 };

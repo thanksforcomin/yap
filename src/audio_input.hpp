@@ -1,12 +1,12 @@
 #pragma once
 
-#include <libavcodec/codec_par.h>
 extern "C" {
 #include <libavdevice/avdevice.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/dict.h>
 #include <libavutil/error.h>
+#include <libavcodec/codec_par.h>
 }
 
 #include "src/utils.hpp"
@@ -42,14 +42,9 @@ namespace audio {
     ~PacketWrapper();
   };
 
-  struct AudioInputInfo {
-    AVCodecParameters *input_params;
-  };
-
   template <typename T>
-  concept AudioSubscriber = requires(T t, PacketWrapper packet, AudioInputInfo info) {
+  concept AudioSubscriber = requires(T t, PacketWrapper packet) {
     { t.process(packet) } -> std::same_as<void>;
-    { t.updateAudioInfo(info) } -> std::same_as<void>;    
   };
 
   inline constexpr auto _formatContextDeleter = [](AVFormatContext *ctx) {

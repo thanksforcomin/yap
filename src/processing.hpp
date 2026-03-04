@@ -7,6 +7,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavutil/dict.h>
 #include <libavutil/error.h>
+#include <libswresample/swresample.h>
 }
 
 #include "src/utils.hpp"
@@ -24,23 +25,41 @@ namespace proc {
     { t.process(data) } -> std::same_as<void>;
   };
 
-  template <Subscriber... Subscribers> class OpusCodec {
+  inline constexpr auto _codecContextDeleter = [](AVCodecContext *context) {
+    if(context)
+      avcodec_free_context(&context);
+  };
+
+  inline constexpr auto _resamplerDeleter = [](SwrContext *context) {
+    if(context)
+      swr_free(&context);
+  };
+
+  template <Subscriber... Subscribers> class OpusEncoder {
+    std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> codec_ctx;
+    std::optional<std::unique_ptr<SwrContext, decltype(_resamplerDeleter)>>
+        resampler;
+    std::tuple<Subscribers&...> subs;
     
   public:
-    OpusCodec() = default;
+    OpusEncoder();
+    OpusEncoder(AVCodecParameters *input_params);
 
-    OpusCodec(const OpusCodec &other) = delete;
-    auto operator=(const OpusCodec &other) -> OpusCodec & = delete;
+    OpusEncoder(const OpusEncoder &other) = delete;
+    auto operator=(const OpusEncoder &other) -> OpusEncoder & = delete;
 
-    OpusCodec(OpusCodec &&other) = default;
-    auto operator=(OpusCodec &&other) -> OpusCodec & = default;
+    OpusEncoder(OpusEncoder &&other) = default;
+    auto operator=(OpusEncoder &&other) -> OpusEncoder & = default;
 
-    ~OpusCodec() = default;
-    
+    ~OpusEncoder() = default;
+
     auto process(const audio::PacketWrapper &packet) -> void;
-    auto updateAudioInfo(const audio::AudioInputInfo &info) -> void;
 
-    auto setup(const audio::AudioInputInfo &info) -> void;
+  private:
+    auto allocateCodec(AVCodecParameters *params) -> AVCodecContext *;
+    auto setUpCodec() -> void;
+
+    auto setUpResampler();
   };
 }
 
