@@ -1,13 +1,14 @@
 #pragma once
 
-
-#include <libavutil/rational.h>
-#include <libavutil/samplefmt.h>
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavcodec/codec_id.h>
 #include <libavcodec/codec_par.h>
 #include <libavcodec/codec.h>
+#include <libavutil/opt.h>
+#include <libavutil/rational.h>
+#include <libavutil/samplefmt.h>
+#include <libswresample/swresample.h>
 }
 
 #include "src/audio_input.hpp"
@@ -67,6 +68,31 @@ namespace proc {
     return codec_ctx;
   }
 
+  template <Subscriber... Subscribers>
+  auto OpusEncoder<Subscribers...>::setUpResampler(AVCodecParameters *params,
+                               AVCodecContext *context)
+      -> Result<SwrContext *> {
+    SwrContext *swr = swr_alloc();
+
+    if (!swr) {
+      utils::report_error("Could not allocate resampler context");
+      return std::unexpected(ResamplerNotAllocated);
+    }
+
+    av_opt_set_chlayout(swr, "in_chlayout", &params->ch_layout, 0);
+    av_opt_set_chlayout(swr, "out_chlayout", &context->ch_layout, 0);
+    av_opt_set_int(swr, "in_sample_rate", params->sample_rate, 0);
+    av_opt_set_int(swr, "out_sample_rate", context->sample_rate, 0);
+    av_opt_set_sample_fmt(swr, "in_sample_fmt", static_cast<AVSampleFormat>(params->format), 0);
+    av_opt_set_sample_fmt(swr, "out_sample_fmt", context->sample_fmt, 0);
+
+    if (auto ret = swr_init(swr); ret < 0) {
+      utils::report_error("Could not initialize resampler context");
+      return std::unexpected(ResamplerNotAllocated);
+    }
+
+    return swr;
+  }
   
 }
 

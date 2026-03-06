@@ -3,6 +3,7 @@
 #include "audio_input.hpp"
 #include "src/utils.hpp"
 #include <cerrno>
+#include <libavformat/avformat.h>
 #include <print>
 #include <utility>
 
@@ -13,7 +14,7 @@ namespace audio {
                                         Subscribers &...subscribers)
     -> Result<AudioInput> {
     auto format_context = makeInput(options, device_url, input_format_name);
-    if (!format_context)
+    if (!format_context) 
       return std::unexpected(format_context.error());
 
     auto audio_index = getAudioStream(*format_context);
@@ -45,11 +46,14 @@ namespace audio {
     }
     
     AVFormatContext *fmt_context = nullptr;
-    
-    if (auto ret = avformat_open_input(&fmt_context, device_url,
-                                       input_format, &options);
+
+    if (auto ret = avformat_open_input(&fmt_context, device_url, input_format,
+                                       &options);
         ret < 0) {
       utils::report_error(ret, "Failed to open device");
+
+      avformat_close_input(&fmt_context);
+      
       return std::unexpected(FailedToOpenDevice);
     }
     

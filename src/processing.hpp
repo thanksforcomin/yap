@@ -26,6 +26,7 @@ namespace proc {
     ResamplingError,
     EncoderNotFound,
     EncoderNotAllocated,
+    ResamplerNotAllocated
   };
   
   template <typename T>
@@ -87,7 +88,8 @@ namespace proc {
     static auto pickCodec() -> Result<AVCodec *>;
     static auto allocateCodec(AVCodecParameters *params, AVCodec *codec)
         -> Result<AVCodecContext *>;
-    static auto setUpResampler(AVCodecParameters *params) -> Result<SwrContext*>;
+    static auto setUpResampler(AVCodecParameters *params,
+                               AVCodecContext *context) -> Result<SwrContext *>;
     
     auto setUpResampler();
   };
