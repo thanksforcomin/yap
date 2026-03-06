@@ -12,16 +12,15 @@ namespace audio {
                                         auto &&input_format_name,
                                         Subscribers &...subscribers)
     -> Result<AudioInput> {
-    auto format_context = makeInput(options, device_url, input_format_name);
+    auto format_context = makeInput(options, device_url);
     if (!format_context)
       return std::unexpected(format_context.error());
 
     auto audio_index = getAudioStream(*format_context);
-    if (!audio_index)
-      return std::unexpected(audio_index.error());
-
-    return AudioInput(*format_context, *audio_index,
-                      subscribers...);
+    if(!audio_index) return std::unexpected(audio_index.error());
+      
+    auto object = AudioInput();
+    
   }
 
   template <AudioSubscriber... Subscribers>
@@ -29,7 +28,7 @@ namespace audio {
                                          auto &&audio_index,
                                          Subscribers &...subscribers)
       : subscribers(std::tie(subscribers...)), audio_index(audio_index),
-        fmt_ctx_ptr(std::forward<decltype(format_context)>(format_context)) {}
+        fmt_ctx_ptr(std::forward(format_context)) {}
   
   template <AudioSubscriber... Subscribers>
   auto AudioInput<Subscribers...>::makeInput(
@@ -58,9 +57,9 @@ namespace audio {
 
   template <AudioSubscriber... Subscribers>
   auto AudioInput<Subscribers...>::getAudioStream(auto&& format_ctx) -> Result<int> {
-    int audio_stream_index = -1;
+    int audio_stream_index;
     
-    if (auto ret = avformat_find_stream_info(format_ctx, nullptr);
+    if (auto ret = avformat_find_stream_info(format_ctx.get(), nullptr);
         ret < 0) {
       utils::report_error("Could not find stream info");
       return std::unexpected(CannotFindStreamInfo);
@@ -136,9 +135,9 @@ namespace audio {
   
   template <AudioSubscriber... Subscribers>
   auto AudioInputBuilder<Subscribers...>::build()
-    -> Result<AudioInput<Subscribers...>> {
+      -> AudioInput<Subscribers...> {
     return std::apply([&](Subscribers &...subscribers) {
-      return AudioInput<Subscribers...>::init(options.get(), device_url.data(), input_format.data(),
+      return AudioInput(options.get(), device_url.data(), input_format.data(),
                         subscribers...);
     }, subs);
   }

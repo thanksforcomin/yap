@@ -55,30 +55,33 @@ namespace audio {
   template <AudioSubscriber... Subscribers> class AudioInput {
     std::tuple<Subscribers&...> subscribers;
 
+    int32_t audio_index;
     std::unique_ptr<AVFormatContext, decltype(_formatContextDeleter)>
         fmt_ctx_ptr;
-    int32_t audio_index;
-    
+
   public:
-    AudioInput(auto&& options, auto &&device_url, auto &&input_format_name,
+    static auto init(auto &&options, auto &&device_url, auto &&input_format_name,
+                     Subscribers &...subscribers) -> Result<AudioInput>;
+    
+    AudioInput(auto&& format_context, auto&& audio_index,
                Subscribers &...subscribers);
 
     AudioInput(const AudioInput &) = delete;
     auto operator=(const AudioInput &) -> AudioInput & = delete;
 
-    AudioInput(AudioInput &&other);
-    auto operator=(AudioInput &&other) -> AudioInput &;
+    AudioInput(AudioInput &&other) = default;
+    auto operator=(AudioInput &&other) -> AudioInput & = default;
 
     ~AudioInput() = default;
 
     auto run() -> void;
 
   private:
-    auto makeInput(AVDictionary *options, utils::formattable auto &&device_url,
+    static auto makeInput(AVDictionary *options, utils::formattable auto &&device_url,
                    utils::formattable auto &&input_format_name)
         -> Result<AVFormatContext *>;
 
-    auto setup() -> Result<void>;
+    static auto getAudioStream(auto&& format_ctx) -> Result<int>;
   };
 
   inline constexpr auto _avDictionaryDeleter = [](AVDictionary *dict) {
@@ -99,7 +102,7 @@ namespace audio {
     auto setOption(auto &&key, auto &&value) -> AudioInputBuilder &;
     auto setDeviceUrl(auto &&value) -> AudioInputBuilder &;
     auto setInputFormat(auto&& value) -> AudioInputBuilder &;
-    auto build() -> AudioInput<Subscribers...>;
+    auto build() -> Result<AudioInput<Subscribers...>>;
   };
 }
 

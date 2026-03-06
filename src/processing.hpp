@@ -1,7 +1,10 @@
 #pragma once
 
 #include "src/audio_input.hpp"
+
 extern "C" {
+#include <libavcodec/codec_par.h>
+#include <libavutil/frame.h>
 #include <libavdevice/avdevice.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
@@ -16,8 +19,18 @@ extern "C" {
 #include <mutex>
 #include <tuple>
 #include <unordered_map>
- 
+
 namespace proc {
+
+  enum ProcessingError {
+    ResamplingError,
+    EncoderNotFound,
+    EncoderNotAllocated,
+  };
+  
+  template <typename T>
+  using Result = std::expected<T, ProcessingError>;
+  
   struct AudioData;
 
   template <typename T>
@@ -35,15 +48,30 @@ namespace proc {
       swr_free(&context);
   };
 
+  inline constexpr auto _frameDeleter = [](AVFrame *frame) {
+    if (frame)
+
+      av_frame_free(&frame);
+  };
+
+  struct Resampler {
+    std::unique_ptr<SwrContext, decltype(_resamplerDeleter)> swr_context;
+    std::unique_ptr<AVFrame, decltype(_frameDeleter)> frame;
+  };
+
   template <Subscriber... Subscribers> class OpusEncoder {
+    std::unique_ptr<AVCodec> codec_ptr;
     std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> codec_ctx;
-    std::optional<std::unique_ptr<SwrContext, decltype(_resamplerDeleter)>>
+    std::optional<Resampler>
         resampler;
     std::tuple<Subscribers&...> subs;
-    
+
   public:
+    static auto init(AVCodecParameters *input_params) -> Result<OpusEncoder>;
+
     OpusEncoder();
-    OpusEncoder(AVCodecParameters *input_params);
+    OpusEncoder(auto &&codec_pointer, auto &&codec_context, auto &&resampler,
+                Subscribers &...subs);
 
     OpusEncoder(const OpusEncoder &other) = delete;
     auto operator=(const OpusEncoder &other) -> OpusEncoder & = delete;
@@ -56,9 +84,11 @@ namespace proc {
     auto process(const audio::PacketWrapper &packet) -> void;
 
   private:
-    auto allocateCodec(AVCodecParameters *params) -> AVCodecContext *;
-    auto setUpCodec() -> void;
-
+    static auto pickCodec() -> Result<AVCodec *>;
+    static auto allocateCodec(AVCodecParameters *params, AVCodec *codec)
+        -> Result<AVCodecContext *>;
+    static auto setUpResampler(AVCodecParameters *params) -> Result<SwrContext*>;
+    
     auto setUpResampler();
   };
 }

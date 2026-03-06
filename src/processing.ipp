@@ -1,6 +1,8 @@
 #pragma once
 
 
+#include <libavutil/rational.h>
+#include <libavutil/samplefmt.h>
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavcodec/codec_id.h>
@@ -16,34 +18,55 @@ extern "C" {
 
 namespace proc {
   template <Subscriber... Subscribers>
-  OpusEncoder<Subscribers...>::OpusEncoder(AVCodecParameters *input_params)
-    : codec_ctx(allocateCodec(input_params)) {
-    
-  }
+  auto OpusEncoder<Subscribers...>::pickCodec()
+    -> Result<AVCodec *> {
+    AVCodec *codec =
+        const_cast<AVCodec *>(avcodec_find_encoder(AV_CODEC_ID_OPUS));
 
-  template <Subscriber... Subscribers>
-  auto OpusEncoder<Subscribers...>::allocateCodec(AVCodecParameters *params)
-      -> AVCodecContext * {
-    const AVCodec *codec = avcodec_find_encoder(AV_CODEC_ID_OPUS);
     if (!codec) {
-      utils::report_error("Failed to create codec");
-      return nullptr;
+      utils::report_error("Could not find opus encoder");
+      return std::unexpected(EncoderNotFound);
     }
 
-    AVCodecContext *context = avcodec_alloc_context3(codec);
-    if (!context) {
-      utils::report_error("Failed to allocate codec");
-      return nullptr;
-    }
-
-    return context;
+    return codec;
   }
 
   template <Subscriber... Subscribers>
-  auto OpusEncoder<Subscribers...>::setUpCodec() -> void {
-    
+  auto OpusEncoder<Subscribers...>::allocateCodec(AVCodecParameters *params,
+                                                  AVCodec *codec)
+      -> Result<AVCodecContext *> {
+    AVCodecContext *codec_ctx = avcodec_alloc_context3(codec);
+
+    if (!codec_ctx) {
+      utils::report_error("Could not allocate opus encoder");
+      return std::unexpected(EncoderNotAllocated);
+    }
+
+    int target_sample_rate = params->sample_rate;
+    if (target_sample_rate != 48000 && target_sample_rate != 24000 &&
+        target_sample_rate != 16000 && target_sample_rate != 12000 &&
+        target_sample_rate != 8000) {
+      target_sample_rate = 48000;
+    }
+
+    codec_ctx->sample_rate = target_sample_rate;
+    codec_ctx->ch_layout = params->ch_layout;
+    codec_ctx->sample_fmt = AV_SAMPLE_FMT_FLTP;
+    codec_ctx->bit_rate = 64000;
+    codec_ctx->time_base = av_make_q(1, target_sample_rate);
+    codec_ctx->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
+
+    if (auto ret = avcodec_open2(codec_ctx, codec, nullptr); ret < 0) {
+      utils::report_error("Could not open opus encoder");
+
+      avcodec_free_context(&codec_ctx);
+      
+      return std::unexpected(EncoderNotAllocated);
+    }
+
+    return codec_ctx;
   }
- 
+
   
 }
 

@@ -9,6 +9,7 @@
 
 #include "audio_input.hpp"
 #include "processing.hpp"
+#include "src/utils.hpp"
 
 extern "C" {
 #include <libavdevice/avdevice.h>
@@ -39,10 +40,17 @@ int main() {
   avdevice_register_all();
   avformat_network_init();
 
-  auto audio_input = audio::AudioInputBuilder(logger)
-                         .setInputFormat("pulse")
-                         .setDeviceUrl("default")
-                         .build();
+  auto audio_input_ = audio::AudioInputBuilder(logger)
+                          .setInputFormat("pulse")
+                          .setDeviceUrl("default")
+                          .build();
+
+  if (!audio_input_) {
+    utils::report_error("Something went wrong when creating audio device");
+    return 1;
+  }
+
+  auto audio_input = std::move(*audio_input_);
 
   audio_input.run();
 };
