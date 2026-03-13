@@ -63,8 +63,7 @@ namespace proc {
   template <Subscriber... Subscribers> class OpusEncoder {
     std::unique_ptr<AVCodec> codec_ptr;
     std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> codec_ctx;
-    std::optional<Resampler>
-        resampler;
+    std::optional<Resampler> resampler;
     std::tuple<Subscribers&...> subs;
 
   public:

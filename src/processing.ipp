@@ -88,6 +88,10 @@ namespace proc {
 
     if (auto ret = swr_init(swr); ret < 0) {
       utils::report_error("Could not initialize resampler context");
+
+      if (swr)
+        swr_free(&swr);
+      
       return std::unexpected(ResamplerNotAllocated);
     }
 
