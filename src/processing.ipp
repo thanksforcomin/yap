@@ -21,8 +21,9 @@ extern "C" {
 
 namespace proc {
 
-  template <Subscriber... Subscribers>
-  auto OpusEncoder<Subscribers...>::init(AVCodecParameters *input_params)
+template <Subscriber... Subscribers>
+auto OpusEncoder<Subscribers...>::init(AVCodecParameters *input_params,
+                                       Subscribers &...subs)
     -> Result<OpusEncoder> {
     auto decoder = pickCodec(input_params->codec_id);
 
@@ -44,9 +45,27 @@ namespace proc {
     if (!encoder_context)
       return encoder_context.error();
 
+    auto resampler = setUpResampler(*decoder_context, *encoder_context);
+
+    if (!resampler)
+      return resampler.error();
+
+    return OpusEncoder(*encoder, *encoder_context, *decoder, *decoder_context,
+                       *resampler, subs...);
+  }
+
+  template <Subscriber... Subscribers>
+  OpusEncoder<Subscribers>::OpusEncoder(auto &&encoder_codec,
+                                        auto &&encoder_context,
+                                        auto &&decoder_codec,
+                                        auto &&decoder_context,
+                                        auto &&resampler, Subscribers &...subs)
+      : decoder_ptr(decoder_codec), decoder_ctx(decoder_context),
+        encoder_ptr(encoder_codec), encoder_ctx(encoder_context),
+        resampler(resampler), subs(std::tie(subs...)) {
     
   }
-  
+    
   template <Subscriber... Subscribers>
   auto OpusEncoder<Subscribers...>::pickCodec(AVCodecID id)
     -> Result<AVCodec *> {
@@ -148,6 +167,12 @@ namespace proc {
     }
 
     return swr;
+  }
+
+  template <Subscriber... Subscribers>
+  auto OpusEncoder<Subscribers...>::process(const audio::PacketWrapper &packet)
+      -> void {
+    std::println("Received a packet");
   }
   
 }

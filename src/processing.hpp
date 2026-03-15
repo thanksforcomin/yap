@@ -72,10 +72,13 @@ namespace proc {
     std::tuple<Subscribers&...> subs;
 
   public:
-    static auto init(AVCodecParameters *input_params) -> Result<OpusEncoder>;
+    static auto init(AVCodecParameters *input_params, Subscribers &...subs)
+        -> Result<OpusEncoder>;
+    
 
-    OpusEncoder();
-    OpusEncoder(auto &&codec_pointer, auto &&codec_context, auto &&resampler,
+    OpusEncoder() = default;
+    OpusEncoder(auto &&encoder_codec, auto &&encoder_context,
+                auto &&decoder_codec, auto &&decoder_context, auto &&resampler,
                 Subscribers &...subs);
 
     OpusEncoder(const OpusEncoder &other) = delete;

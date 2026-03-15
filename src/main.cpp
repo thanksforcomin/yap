@@ -36,6 +36,8 @@ struct PrimitiveLogger {
 
 int main() {
   PrimitiveLogger logger;
+
+  OpusEncoder opus_encoder;
   
   avdevice_register_all();
   avformat_network_init();
