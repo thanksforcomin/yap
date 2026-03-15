@@ -26,6 +26,9 @@ namespace proc {
     ResamplingError,
     EncoderNotFound,
     EncoderNotAllocated,
+    EncoderNotOpen,
+    DecoderNotAllocated,
+    DecoderNotOpen,
     ResamplerNotAllocated
   };
   
@@ -61,8 +64,10 @@ namespace proc {
   };
 
   template <Subscriber... Subscribers> class OpusEncoder {
-    std::unique_ptr<AVCodec> codec_ptr;
-    std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> codec_ctx;
+    std::unique_ptr<AVCodec> decoder_ptr;
+    std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> decoder_ctx;
+    std::unique_ptr<AVCodec> encoder_ptr;
+    std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> encoder_ctx;
     std::optional<Resampler> resampler;
     std::tuple<Subscribers&...> subs;
 
@@ -84,13 +89,13 @@ namespace proc {
     auto process(const audio::PacketWrapper &packet) -> void;
 
   private:
-    static auto pickCodec() -> Result<AVCodec *>;
-    static auto allocateCodec(AVCodecParameters *params, AVCodec *codec)
+    static auto pickCodec(AVCodecID id) -> Result<AVCodec *>;
+    static auto setUpEncoder(AVCodecParameters *params, AVCodec *codec)
         -> Result<AVCodecContext *>;
-    static auto setUpResampler(AVCodecParameters *params,
-                               AVCodecContext *context) -> Result<SwrContext *>;
-    
-    auto setUpResampler();
+    static auto setUpResampler(AVCodecContext *decoder, AVCodecContext *encoder)
+        -> Result<SwrContext *>;
+    static auto setUpDecoder(AVCodecParameters *params, AVCodec *codec)
+        -> Result<AVCodecContext *>;
   };
 }
 
