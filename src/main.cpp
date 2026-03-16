@@ -37,12 +37,12 @@ struct PrimitiveLogger {
 int main() {
   PrimitiveLogger logger;
 
-  OpusEncoder opus_encoder;
+  proc::OpusEncoder opus_encoder;
   
   avdevice_register_all();
   avformat_network_init();
 
-  auto audio_input_ = audio::AudioInputBuilder(logger)
+  auto audio_input_ = audio::AudioInputBuilder(logger, opus_encoder)
                           .setInputFormat("pulse")
                           .setDeviceUrl("default")
                           .build();
@@ -54,6 +54,15 @@ int main() {
 
   auto audio_input = std::move(*audio_input_);
 
+  auto opus_encoder_ = proc::OpusEncoder<>::init(audio_input.getCodecParams());
+
+  if (!opus_encoder_) {
+    utils::report_error("Something went wrong when creating opus encoder");
+    return 1;
+  }
+
+  opus_encoder = std::move(*opus_encoder_);
+  
   audio_input.run();
 };
  

@@ -76,6 +76,8 @@ namespace audio {
 
     auto run() -> void;
 
+    auto getCodecParams() const -> AVCodecParameters*;
+
   private:
     static auto makeInput(AVDictionary *options, utils::formattable auto &&device_url,
                    utils::formattable auto &&input_format_name)

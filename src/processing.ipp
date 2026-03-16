@@ -1,7 +1,5 @@
 #pragma once
 
-#include <libavcodec/defs.h>
-#include <libavutil/channel_layout.h>
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavcodec/codec_id.h>
@@ -11,6 +9,8 @@ extern "C" {
 #include <libavutil/rational.h>
 #include <libavutil/samplefmt.h>
 #include <libswresample/swresample.h>
+#include <libavcodec/defs.h>
+#include <libavutil/channel_layout.h>
 }
 
 #include "src/audio_input.hpp"
@@ -28,43 +28,41 @@ auto OpusEncoder<Subscribers...>::init(AVCodecParameters *input_params,
     auto decoder = pickCodec(input_params->codec_id);
 
     if (!decoder)
-      return decoder.error();
+      return std::unexpected(decoder.error());
 
     auto decoder_context = setUpDecoder(input_params, *decoder);
 
     if (!decoder_context)
-      return decoder_context.error();
+      return std::unexpected(decoder_context.error());
 
     auto encoder = pickCodec(AV_CODEC_ID_OPUS);
 
     if (!encoder)
-      return encoder.error();
+      return std::unexpected(encoder.error());
 
     auto encoder_context = setUpEncoder(input_params, *encoder);
 
     if (!encoder_context)
-      return encoder_context.error();
+      return std::unexpected(encoder_context.error());
 
     auto resampler = setUpResampler(*decoder_context, *encoder_context);
 
     if (!resampler)
-      return resampler.error();
+      return std::unexpected(resampler.error());
 
     return OpusEncoder(*encoder, *encoder_context, *decoder, *decoder_context,
                        *resampler, subs...);
   }
 
   template <Subscriber... Subscribers>
-  OpusEncoder<Subscribers>::OpusEncoder(auto &&encoder_codec,
+  OpusEncoder<Subscribers...>::OpusEncoder(auto &&encoder_codec,
                                         auto &&encoder_context,
                                         auto &&decoder_codec,
                                         auto &&decoder_context,
                                         auto &&resampler, Subscribers &...subs)
       : decoder_ptr(decoder_codec), decoder_ctx(decoder_context),
         encoder_ptr(encoder_codec), encoder_ctx(encoder_context),
-        resampler(resampler), subs(std::tie(subs...)) {
-    
-  }
+        swr_context(resampler), subs(std::tie(subs...)) {}
     
   template <Subscriber... Subscribers>
   auto OpusEncoder<Subscribers...>::pickCodec(AVCodecID id)
@@ -92,7 +90,7 @@ auto OpusEncoder<Subscribers...>::init(AVCodecParameters *input_params,
 
     enc_ctx->sample_rate = 48000;
     enc_ctx->ch_layout = (AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO;
-    enc_ctx->sample_fmt = AV_SAMPLE_FMT_FLTP;
+    enc_ctx->sample_fmt = AV_SAMPLE_FMT_FLT;
     enc_ctx->bit_rate = 64000;
     enc_ctx->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
 

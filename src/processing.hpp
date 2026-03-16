@@ -42,25 +42,19 @@ namespace proc {
     { t.process(data) } -> std::same_as<void>;
   };
 
-  inline constexpr auto _codecContextDeleter = [](AVCodecContext *context) {
+  auto _codecContextDeleter = [](AVCodecContext *context) {
     if(context)
       avcodec_free_context(&context);
   };
 
-  inline constexpr auto _resamplerDeleter = [](SwrContext *context) {
+  auto _resamplerDeleter = [](SwrContext *context) {
     if(context)
       swr_free(&context);
   };
 
-  inline constexpr auto _frameDeleter = [](AVFrame *frame) {
+  auto _frameDeleter = [](AVFrame *frame) {
     if (frame)
-
       av_frame_free(&frame);
-  };
-
-  struct Resampler {
-    std::unique_ptr<SwrContext, decltype(_resamplerDeleter)> swr_context;
-    std::unique_ptr<AVFrame, decltype(_frameDeleter)> frame;
   };
 
   template <Subscriber... Subscribers> class OpusEncoder {
@@ -68,13 +62,12 @@ namespace proc {
     std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> decoder_ctx;
     std::unique_ptr<AVCodec> encoder_ptr;
     std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> encoder_ctx;
-    std::optional<Resampler> resampler;
+    std::unique_ptr<SwrContext, decltype(_resamplerDeleter)> swr_context;
     std::tuple<Subscribers&...> subs;
 
   public:
     static auto init(AVCodecParameters *input_params, Subscribers &...subs)
         -> Result<OpusEncoder>;
-    
 
     OpusEncoder() = default;
     OpusEncoder(auto &&encoder_codec, auto &&encoder_context,

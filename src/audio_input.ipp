@@ -3,6 +3,7 @@
 #include "audio_input.hpp"
 #include "src/utils.hpp"
 #include <cerrno>
+#include <libavcodec/codec_par.h>
 #include <libavformat/avformat.h>
 #include <print>
 #include <utility>
@@ -106,6 +107,12 @@ namespace audio {
         }, subscribers);
       }
     }
+  }
+
+  template <AudioSubscriber... Subscribers>
+  auto AudioInput<Subscribers...>::getCodecParams() const
+      -> AVCodecParameters * {
+    return fmt_ctx_ptr->streams[audio_index]->codecpar;
   }
 
   template <AudioSubscriber... Subscribers>

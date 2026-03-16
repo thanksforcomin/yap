@@ -11,6 +11,7 @@ libav_deps = [
   dependency('libavformat'),
   dependency('libavdevice'),
   dependency('libavutil'),
+  dependency('libswresample')
 ]
 
 warning_flags = [
