@@ -165,12 +165,14 @@ auto OpusEncoder<Subscribers...>::init(AVCodecParameters *input_params,
     }
 
     return swr;
-  }
+  } 
 
   template <Subscriber... Subscribers>
   auto OpusEncoder<Subscribers...>::process(const audio::PacketWrapper &packet)
       -> void {
-    std::println("Received a packet");
+    if (auto ret = avcodec_send_packet(decoder_ctx.get(), packet.pack)) {
+      
+    }
   }
   
 }

@@ -42,17 +42,17 @@ namespace proc {
     { t.process(data) } -> std::same_as<void>;
   };
 
-  auto _codecContextDeleter = [](AVCodecContext *context) {
+  inline auto _codecContextDeleter = [](AVCodecContext *context) {
     if(context)
       avcodec_free_context(&context);
   };
 
-  auto _resamplerDeleter = [](SwrContext *context) {
+  inline auto _resamplerDeleter = [](SwrContext *context) {
     if(context)
       swr_free(&context);
   };
 
-  auto _frameDeleter = [](AVFrame *frame) {
+  inline auto _frameDeleter = [](AVFrame *frame) {
     if (frame)
       av_frame_free(&frame);
   };
