@@ -31,7 +31,7 @@ namespace observer {
   };
 
   template <Subscriber... Subscribers> class RuntimeObserver {
-    using ObserverType = std::variant<Subscribers*...>;
+    using ObserverType = std::variant<std::weak_ptr<Subscribers>...>;
 
     std::vector<ObserverType> subscribers;
     std::shared_mutex mutex;
@@ -46,9 +46,12 @@ namespace observer {
     auto operator=(RuntimeObserver &&) -> RuntimeObserver & = default;
 
     ~RuntimeObserver() = default;
-    
-    auto subscribe(auto &sub) -> Result<void>;
-    auto unsubscribe(auto &sub) -> Result<void>;
+
+    template <Subscriber T>
+    auto subscribe(std::shared_ptr<T>& sub) -> Result<void>;
+
+    template <Subscriber T>
+    auto unsubscribe(std::shared_ptr<T>& sub) -> Result<void>;
 
     auto process(auto&& data) -> void;
 

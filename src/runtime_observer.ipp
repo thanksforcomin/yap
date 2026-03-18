@@ -6,22 +6,28 @@
 
 namespace observer {
   template <Subscriber... Subscribers>
-  auto RuntimeObserver<Subscribers...>::subscribe(auto &sub) -> Result<void> {
+  template <Subscriber T>
+  auto RuntimeObserver<Subscribers...>::subscribe(std::shared_ptr<T> &sub) -> Result<void> {
     std::unique_lock lock(mutex);
 
     if (contains(sub))
       return std::unexpected(dublicateObserver);
 
-    subscribers.push_back(&sub);
+    subscribers.push_back(std::weak_ptr<T>(sub));
   }
 
   template <Subscriber... Subscribers>
-  auto RuntimeObserver<Subscribers...>::unsubscribe(auto &sub) -> Result<void> {
+  template <Subscriber T>
+  auto RuntimeObserver<Subscribers...>::unsubscribe(std::shared_ptr<T> &sub) -> Result<void> {
     std::unique_lock lock(mutex);
 
     auto it = std::ranges::find_if(
         subscribers.begin(), subscribers.end(), [&](const auto &item) -> bool {
-          return std::visit([&](auto *ptr) { return ptr == &sub; }, item);
+          return std::visit(
+              [&](const auto &wp) {
+                return !wp.expired() && wp.lock().get() == item.get();
+              },
+              item);
         });
 
     if (it != subscribers.end())
@@ -41,7 +47,11 @@ namespace observer {
   auto RuntimeObserver<Subscribers...>::contains(auto &sub) -> bool {
     auto it = std::ranges::find_if(
         subscribers.begin(), subscribers.end(), [&](const auto &item) -> bool {
-          return std::visit([&](auto *ptr) { return ptr == &sub; }, item);
+          return std::visit(
+              [&](const auto &wp) {
+                return !wp.expired() && wp.lock().get() == item.get();
+              },
+              item);
         });
 
     if (it != subscribers.end())
