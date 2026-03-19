@@ -21,7 +21,7 @@ extern "C" {
 
 struct PrimitiveLogger {
   void process(const audio::PacketWrapper &wrappa) {
-    std::println("Received audio packet of size {}", wrappa.pack.size);
+    std::println("Received audio packet of size {}", wrappa.pack->size);
   }
 
   PrimitiveLogger() = default;

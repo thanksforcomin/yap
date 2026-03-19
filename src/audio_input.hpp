@@ -29,7 +29,7 @@ namespace audio {
   using Result = std::expected<T, Errors>;
 
   struct PacketWrapper {
-    AVPacket pack;
+    AVPacket *pack;
 
     PacketWrapper();
 

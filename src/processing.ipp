@@ -1,5 +1,6 @@
 #pragma once
 
+#include <libavutil/frame.h>
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavcodec/codec_id.h>
@@ -16,16 +17,16 @@ extern "C" {
 #include "src/audio_input.hpp"
 #include "src/utils.hpp"
 #include <memory>
-
+#include <iostream>
 #include "processing.hpp"
 
 namespace proc {
 
-template <Subscriber... Subscribers>
-auto OpusEncoder<Subscribers...>::init(AVCodecParameters *input_params,
-                                       Subscribers &...subs)
+  template <Subscriber... Subscribers>
+  auto OpusEncoder<Subscribers...>::init(AVCodecParameters *input_params,
+                                         Subscribers &...subs)
     -> Result<OpusEncoder> {
-    auto decoder = pickCodec(input_params->codec_id);
+    auto decoder = pickDecoder(input_params->codec_id);
 
     if (!decoder)
       return std::unexpected(decoder.error());
@@ -35,7 +36,7 @@ auto OpusEncoder<Subscribers...>::init(AVCodecParameters *input_params,
     if (!decoder_context)
       return std::unexpected(decoder_context.error());
 
-    auto encoder = pickCodec(AV_CODEC_ID_OPUS);
+    auto encoder = pickEncoder(AV_CODEC_ID_OPUS);
 
     if (!encoder)
       return std::unexpected(encoder.error());
@@ -50,25 +51,45 @@ auto OpusEncoder<Subscribers...>::init(AVCodecParameters *input_params,
     if (!resampler)
       return std::unexpected(resampler.error());
 
+    auto in_frame = av_frame_alloc();
+    auto out_frame = av_frame_alloc();
+
+    std::println("Set up the Opus encoder");
+
     return OpusEncoder(*encoder, *encoder_context, *decoder, *decoder_context,
-                       *resampler, subs...);
+                       *resampler, in_frame, out_frame, subs...);
+    
   }
 
   template <Subscriber... Subscribers>
-  OpusEncoder<Subscribers...>::OpusEncoder(auto &&encoder_codec,
-                                        auto &&encoder_context,
-                                        auto &&decoder_codec,
-                                        auto &&decoder_context,
-                                        auto &&resampler, Subscribers &...subs)
+  OpusEncoder<Subscribers...>::OpusEncoder(
+      auto &&encoder_codec, auto &&encoder_context, auto &&decoder_codec,
+      auto &&decoder_context, auto &&resampler, auto &&frame_in,
+      auto &&frame_out, Subscribers &...subs)
       : decoder_ptr(decoder_codec), decoder_ctx(decoder_context),
         encoder_ptr(encoder_codec), encoder_ctx(encoder_context),
-        swr_context(resampler), subs(std::tie(subs...)) {}
+        swr_context(resampler), frame_in(frame_in), frame_out(frame_out),
+        subs(std::tie(subs...)) {}
     
   template <Subscriber... Subscribers>
-  auto OpusEncoder<Subscribers...>::pickCodec(AVCodecID id)
+  auto OpusEncoder<Subscribers...>::pickEncoder(AVCodecID id)
     -> Result<AVCodec *> {
     AVCodec *codec =
         const_cast<AVCodec *>(avcodec_find_encoder(id));
+
+    if (!codec) {
+      utils::report_error("Could not find opus encoder");
+      return std::unexpected(EncoderNotFound);
+    }
+
+    return codec;
+  }
+
+  template <Subscriber... Subscribers>
+  auto OpusEncoder<Subscribers...>::pickDecoder(AVCodecID id)
+    -> Result<AVCodec *> {
+    AVCodec *codec =
+        const_cast<AVCodec *>(avcodec_find_decoder(id));
 
     if (!codec) {
       utils::report_error("Could not find opus encoder");
@@ -165,14 +186,21 @@ auto OpusEncoder<Subscribers...>::init(AVCodecParameters *input_params,
     }
 
     return swr;
-  } 
+  }
 
   template <Subscriber... Subscribers>
   auto OpusEncoder<Subscribers...>::process(const audio::PacketWrapper &packet)
       -> void {
-    if (auto ret = avcodec_send_packet(decoder_ctx.get(), packet.pack)) {
-      
+    if (auto ret = avcodec_send_packet(decoder_ctx.get(), packet.pack);
+        ret < 0) {
+      utils::report_error(ret, "Error sending packet to decoder");
     }
+
+    int retcode = 0;
+    while (retcode >= 0) {
+      retcode = avcodec_receive_frame(decoder_ctx.get(), frame_in.get());
+    }
+    
   }
   
 }

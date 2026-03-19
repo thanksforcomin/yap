@@ -63,6 +63,9 @@ namespace proc {
     std::unique_ptr<AVCodec> encoder_ptr;
     std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> encoder_ctx;
     std::unique_ptr<SwrContext, decltype(_resamplerDeleter)> swr_context;
+    std::unique_ptr<AVFrame, decltype(_frameDeleter)> frame_in;
+    std::unique_ptr<AVFrame, decltype(_frameDeleter)> frame_out;
+    
     std::tuple<Subscribers&...> subs;
 
   public:
@@ -72,6 +75,7 @@ namespace proc {
     OpusEncoder() = default;
     OpusEncoder(auto &&encoder_codec, auto &&encoder_context,
                 auto &&decoder_codec, auto &&decoder_context, auto &&resampler,
+                auto &&frame_in, auto &&frame_out,
                 Subscribers &...subs);
 
     OpusEncoder(const OpusEncoder &other) = delete;
@@ -85,12 +89,13 @@ namespace proc {
     auto process(const audio::PacketWrapper &packet) -> void;
 
   private:
-    static auto pickCodec(AVCodecID id) -> Result<AVCodec *>;
-    static auto setUpEncoder(AVCodecParameters *params, AVCodec *codec)
+    static auto pickEncoder(AVCodecID id) -> Result<AVCodec *>;
+    static auto pickDecoder(AVCodecID id) -> Result<AVCodec *>;
+    static auto setUpEncoder(AVCodecParameters *params, AVCodec *codec) 
         -> Result<AVCodecContext *>;
-    static auto setUpResampler(AVCodecContext *decoder, AVCodecContext *encoder)
+    static auto setUpResampler(AVCodecContext *decoder, AVCodecContext *encoder) 
         -> Result<SwrContext *>;
-    static auto setUpDecoder(AVCodecParameters *params, AVCodec *codec)
+    static auto setUpDecoder(AVCodecParameters *params, AVCodec *codec) 
         -> Result<AVCodecContext *>;
   };
 }

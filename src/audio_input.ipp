@@ -93,7 +93,7 @@ namespace audio {
     PacketWrapper pack;
 
     while (true) {
-      if (auto ret = av_read_frame(fmt_ctx_ptr.get(), &pack.pack); ret < 0) {
+      if (auto ret = av_read_frame(fmt_ctx_ptr.get(), pack.pack); ret < 0) {
         if (ret == AVERROR_EOF || ret == AVERROR(EAGAIN))
           break;
 
@@ -101,9 +101,10 @@ namespace audio {
         break;
       }
 
-      if (pack.pack.stream_index == audio_index) {
+      if (pack.pack->stream_index == audio_index) {
         std::apply([&](Subscribers&... subs) {
           (subs.process(pack),...);
+    
         }, subscribers);
       }
     }
