@@ -1,6 +1,7 @@
 #pragma once
 
 #include <libavutil/frame.h>
+#include <print>
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavcodec/codec_id.h>
@@ -52,12 +53,13 @@ namespace proc {
       return std::unexpected(resampler.error());
 
     auto in_frame = av_frame_alloc();
-    auto out_frame = av_frame_alloc();
+    // TODO: fix this magic number bullshit
+    auto out_frame = setUpOutFrame(*encoder_context, 200);
 
     std::println("Set up the Opus encoder");
 
     return OpusEncoder(*encoder, *encoder_context, *decoder, *decoder_context,
-                       *resampler, in_frame, out_frame, subs...);
+                       *resampler, in_frame, *out_frame, subs...);
     
   }
 
@@ -145,6 +147,9 @@ namespace proc {
       return std::unexpected(DecoderNotOpen);
     }
 
+    // JUST TO BE SURE
+    dec_ctx->ch_layout = (AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO;
+    
     if (auto ret = avcodec_open2(dec_ctx, codec, nullptr); ret < 0) {
       utils::report_error("Could not open decoder");
 
@@ -167,15 +172,16 @@ namespace proc {
       return std::unexpected(ResamplerNotAllocated);
     }
 
-    av_opt_set_chlayout(swr, "in_chlayout", &decoder->ch_layout, 0);
-    av_opt_set_chlayout(swr, "out_chlayout", &encoder->ch_layout, 0);
+    int ret = swr_alloc_set_opts2(&swr,
+                                  &encoder->ch_layout, encoder->sample_fmt, encoder->sample_rate,
+                                  &decoder->ch_layout, decoder->sample_fmt, decoder->sample_rate,
+                                  0, nullptr);
+    if (ret < 0) {
+        swr_free(&swr);
+        utils::report_error("Could not set resampler options");
+        return std::unexpected(ResamplerNotAllocated);
+    }
     
-    av_opt_set_int(swr, "in_sample_rate", decoder->sample_rate, 0);
-    av_opt_set_int(swr, "out_sample_rate", encoder->sample_rate, 0);
-    
-    av_opt_set_sample_fmt(swr, "in_sample_fmt", decoder->sample_fmt, 0);
-    av_opt_set_sample_fmt(swr, "out_sample_fmt", encoder->sample_fmt, 0);
-
     if (auto ret = swr_init(swr); ret < 0) {
       utils::report_error("Could not initialize resampler context");
 
@@ -189,6 +195,27 @@ namespace proc {
   }
 
   template <Subscriber... Subscribers>
+  auto OpusEncoder<Subscribers...>::setUpOutFrame(AVCodecContext *encoder,
+                                                  int max_samples)
+      -> Result<AVFrame *> {
+    auto out_frame = av_frame_alloc();
+
+    out_frame->format = encoder->sample_fmt;
+    out_frame->ch_layout = encoder->ch_layout;
+    out_frame->sample_rate = encoder->sample_rate;
+    out_frame->nb_samples = max_samples;
+
+    if (auto ret = av_frame_get_buffer(out_frame, 0); ret < 0) {
+      utils::report_error(ret, "Issues with frame buffer allocation");
+      av_frame_unref(out_frame);
+
+      return std::unexpected(FrameAllocationFault);
+    }
+
+    return out_frame;
+  }
+
+  template <Subscriber... Subscribers>
   auto OpusEncoder<Subscribers...>::process(const audio::PacketWrapper &packet)
       -> void {
     if (auto ret = avcodec_send_packet(decoder_ctx.get(), packet.pack);
@@ -199,8 +226,51 @@ namespace proc {
     int retcode = 0;
     while (retcode >= 0) {
       retcode = avcodec_receive_frame(decoder_ctx.get(), frame_in.get());
+      
+      if (retcode == AVERROR(EAGAIN) || retcode == AVERROR_EOF)
+        break;
+
+      if (retcode < 0) {
+        utils::report_error(retcode, "Error retreiving frame from decoder");
+        break;
+      }
+      
+      std::println("Currently awaiting {} samples", frame_out->nb_samples);
+
+      int needed_samples =
+          swr_get_out_samples(swr_context.get(), frame_in->nb_samples);
+
+      if(needed_samples > frame_out->nb_samples) {
+        av_frame_unref(frame_out.get());
+        
+        frame_out->nb_samples = needed_samples;
+        frame_out->format = encoder_ctx->sample_fmt;
+        frame_out->ch_layout = encoder_ctx->ch_layout;
+        frame_out->sample_rate = encoder_ctx->sample_rate;
+
+        if (auto ret = av_frame_get_buffer(frame_out.get(), 0); ret < 0) {
+          utils::report_error(ret, "Failed to make the buffer bigger");
+          av_frame_unref(frame_out.get());
+          return;
+        } else {
+          std::println("Made the buffer bigger, it's {} bytes now", needed_samples);
+        }
+      }
+                                                               
+      if (auto ret = swr_convert_frame(swr_context.get(), frame_out.get(),
+                                       frame_in.get());
+          ret < 0) {
+        utils::report_error(ret, "Failed to reformat the frame");
+        return;
+      }
+
+      if (auto ret = avcodec_send_frame(encoder_ctx.get(), frame_out.get());
+          ret < 0) {
+        utils::report_error(ret, "Failed to send data to encoder");
+        return;
+      }
+      
     }
-    
   }
   
 }

@@ -29,7 +29,8 @@ namespace proc {
     EncoderNotOpen,
     DecoderNotAllocated,
     DecoderNotOpen,
-    ResamplerNotAllocated
+    ResamplerNotAllocated,
+    FrameAllocationFault
   };
   
   template <typename T>
@@ -88,6 +89,8 @@ namespace proc {
 
     auto process(const audio::PacketWrapper &packet) -> void;
 
+    inline auto resize_out_frame(int needed_samples);
+
   private:
     static auto pickEncoder(AVCodecID id) -> Result<AVCodec *>;
     static auto pickDecoder(AVCodecID id) -> Result<AVCodec *>;
@@ -95,8 +98,9 @@ namespace proc {
         -> Result<AVCodecContext *>;
     static auto setUpResampler(AVCodecContext *decoder, AVCodecContext *encoder) 
         -> Result<SwrContext *>;
-    static auto setUpDecoder(AVCodecParameters *params, AVCodec *codec) 
+    static auto setUpDecoder(AVCodecParameters *params, AVCodec *codec)
         -> Result<AVCodecContext *>;
+    static auto setUpOutFrame(AVCodecContext *encoder, int max_samples) -> Result<AVFrame*>;
   };
 }
 
