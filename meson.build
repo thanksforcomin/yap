@@ -53,6 +53,7 @@ add_project_link_arguments(
 files = [
   'src/main.cpp',
   'src/audio_input.cpp',
+  'src/processing.cpp',
 ]
 
 executable('yap', files, dependencies: boost_deps + libav_deps)

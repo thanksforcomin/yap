@@ -216,6 +216,26 @@ namespace proc {
   }
 
   template <Subscriber... Subscribers>
+  auto OpusEncoder<Subscribers...>::resize_out_frame(int nb_samples) -> void {
+      if(nb_samples > frame_out->nb_samples) {
+        av_frame_unref(frame_out.get());
+        
+        frame_out->nb_samples = nb_samples;
+        frame_out->format = encoder_ctx->sample_fmt;
+        frame_out->ch_layout = encoder_ctx->ch_layout;
+        frame_out->sample_rate = encoder_ctx->sample_rate;
+
+        if (auto ret = av_frame_get_buffer(frame_out.get(), 0); ret < 0) {
+          utils::report_error(ret, "Failed to make the buffer bigger");
+          av_frame_unref(frame_out.get());
+          return;
+        } else {
+          std::println("Made the buffer bigger, it's {} bytes now", nb_samples);
+        }
+      }
+  }
+
+  template <Subscriber... Subscribers>
   auto OpusEncoder<Subscribers...>::process(const audio::PacketWrapper &packet)
       -> void {
     if (auto ret = avcodec_send_packet(decoder_ctx.get(), packet.pack);
@@ -234,43 +254,29 @@ namespace proc {
         utils::report_error(retcode, "Error retreiving frame from decoder");
         break;
       }
-      
-      std::println("Currently awaiting {} samples", frame_out->nb_samples);
 
       int needed_samples =
-          swr_get_out_samples(swr_context.get(), frame_in->nb_samples);
-
-      if(needed_samples > frame_out->nb_samples) {
-        av_frame_unref(frame_out.get());
-        
-        frame_out->nb_samples = needed_samples;
-        frame_out->format = encoder_ctx->sample_fmt;
-        frame_out->ch_layout = encoder_ctx->ch_layout;
-        frame_out->sample_rate = encoder_ctx->sample_rate;
-
-        if (auto ret = av_frame_get_buffer(frame_out.get(), 0); ret < 0) {
-          utils::report_error(ret, "Failed to make the buffer bigger");
-          av_frame_unref(frame_out.get());
-          return;
-        } else {
-          std::println("Made the buffer bigger, it's {} bytes now", needed_samples);
-        }
-      }
-                                                               
+        swr_get_out_samples(swr_context.get(), frame_in->nb_samples);
+      
+      std::println("There are {} samples for us to process", needed_samples);
+      
+      resize_out_frame(ENCODER_FRAME_SIZE);
+      
       if (auto ret = swr_convert_frame(swr_context.get(), frame_out.get(),
                                        frame_in.get());
           ret < 0) {
         utils::report_error(ret, "Failed to reformat the frame");
         return;
       }
-
-      if (auto ret = avcodec_send_frame(encoder_ctx.get(), frame_out.get());
-          ret < 0) {
-        utils::report_error(ret, "Failed to send data to encoder");
-        return;
-      }
       
+      
+      if (auto ret = avcodec_send_frame(encoder_ctx.get(), frame_out.get());
+            ret < 0) {
+          utils::report_error(ret, "Failed to send data to encoder");
+          return;
+        }
     }
+    
   }
   
 }

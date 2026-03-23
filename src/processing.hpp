@@ -1,6 +1,7 @@
 #pragma once
 
 #include "src/audio_input.hpp"
+#include <libavutil/samplefmt.h>
 
 extern "C" {
 #include <libavcodec/codec_par.h>
@@ -11,11 +12,13 @@ extern "C" {
 #include <libavutil/dict.h>
 #include <libavutil/error.h>
 #include <libswresample/swresample.h>
+#include <libavutil/audio_fifo.h>
 }
 
 #include "src/utils.hpp"
 #include <expected>
 #include <memory>
+#include <vector>
 #include <mutex>
 #include <tuple>
 #include <unordered_map>
@@ -30,7 +33,8 @@ namespace proc {
     DecoderNotAllocated,
     DecoderNotOpen,
     ResamplerNotAllocated,
-    FrameAllocationFault
+    FrameAllocationFault,
+    AudioArrayError
   };
   
   template <typename T>
@@ -58,6 +62,57 @@ namespace proc {
       av_frame_free(&frame);
   };
 
+  inline auto _fifoDeleter = [](AVAudioFifo *fifo) {
+    if (fifo)
+      av_audio_fifo_free(fifo);
+  };
+
+  template<Subscriber Next>
+  class Decoder {
+    std::unique_ptr<AVCodec> decoder_ptr;
+    std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> decoder_ctx;
+
+    Next *next;
+
+  public:
+    static auto init(AVCodecParameters *input_params, Next &next) -> Result<Decoder>;
+
+    Decoder() = default;
+    Decoder(auto &&dec_ptr, auto &&dec_ctx);
+
+    Decoder(const Decoder &) = delete;
+    auto operator=(const Decoder &) -> Decoder & = delete;
+
+    Decoder(Decoder &&);
+    auto operator=(Decoder &&) -> Decoder &;
+
+    ~Decoder() = default;
+
+    auto process(const audio::PacketWrapper data) -> void;
+
+  private:
+    static auto pickDecoder(AVCodecID id) -> Result<AVCodec *>;
+    static auto setUpDecoder(AVCodecParameters *params, AVCodec *codec)
+        -> Result<AVCodec *>;
+  };
+
+  template <Subscriber Next>
+  class Resampler {
+    std::unique_ptr<SwrContext, decltype(_resamplerDeleter)> swr_context;
+
+    Next *next;
+
+  public:
+    static auto init()
+  };
+
+  template <Subscriber Next>
+  class Encoder {
+    std::thread worker_thread;
+    
+    
+  };
+
   template <Subscriber... Subscribers> class OpusEncoder {
     std::unique_ptr<AVCodec> decoder_ptr;
     std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> decoder_ctx;
@@ -66,6 +121,9 @@ namespace proc {
     std::unique_ptr<SwrContext, decltype(_resamplerDeleter)> swr_context;
     std::unique_ptr<AVFrame, decltype(_frameDeleter)> frame_in;
     std::unique_ptr<AVFrame, decltype(_frameDeleter)> frame_out;
+    std::unique_ptr<AVAudioFifo, decltype(_fifoDeleter)> fifo_buffer;
+
+    static int ENCODER_FRAME_SIZE;
     
     std::tuple<Subscribers&...> subs;
 
@@ -88,8 +146,7 @@ namespace proc {
     ~OpusEncoder() = default;
 
     auto process(const audio::PacketWrapper &packet) -> void;
-
-    inline auto resize_out_frame(int needed_samples);
+    auto resize_out_frame(int nb_samples) -> void;
 
   private:
     static auto pickEncoder(AVCodecID id) -> Result<AVCodec *>;
@@ -100,8 +157,16 @@ namespace proc {
         -> Result<SwrContext *>;
     static auto setUpDecoder(AVCodecParameters *params, AVCodec *codec)
         -> Result<AVCodecContext *>;
-    static auto setUpOutFrame(AVCodecContext *encoder, int max_samples) -> Result<AVFrame*>;
+    static auto setUpOutFrame(AVCodecContext *encoder, int max_samples)
+        -> Result<AVFrame *>;
+
+    auto read_from_decoder() -> Result<void>;
+    auto resample_audio() -> Result<void>;
+    auto add_samples_to_fifo() -> Result<void>;
   };
+
+  template <Subscriber... Subscribers>
+  int OpusEncoder<Subscribers...>::ENCODER_FRAME_SIZE = 960;
 }
 
 #include "processing.ipp"
