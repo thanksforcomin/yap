@@ -1,6 +1,9 @@
 #pragma once
 
 #include "src/audio_input.hpp"
+#include <condition_variable>
+#include <libavcodec/defs.h>
+#include <libavutil/channel_layout.h>
 #include <libavutil/samplefmt.h>
 
 extern "C" {
@@ -18,6 +21,7 @@ extern "C" {
 #include "src/utils.hpp"
 #include <expected>
 #include <memory>
+#include <thread>
 #include <vector>
 #include <mutex>
 #include <tuple>
@@ -83,18 +87,23 @@ namespace proc {
     Decoder(const Decoder &) = delete;
     auto operator=(const Decoder &) -> Decoder & = delete;
 
-    Decoder(Decoder &&);
-    auto operator=(Decoder &&) -> Decoder &;
+    Decoder(Decoder &&) = default;
+    auto operator=(Decoder &&) -> Decoder & = default;
 
     ~Decoder() = default;
 
     auto process(const audio::PacketWrapper data) -> void;
+    auto getDecoderPtr() const -> const AVCodecContext &;
+
+    auto setNext(const Next &obj) -> void;
+    auto process(auto&& data) -> void;
 
   private:
     static auto pickDecoder(AVCodecID id) -> Result<AVCodec *>;
     static auto setUpDecoder(AVCodecParameters *params, AVCodec *codec)
         -> Result<AVCodec *>;
   };
+
 
   template <Subscriber Next>
   class Resampler {
@@ -103,12 +112,53 @@ namespace proc {
     Next *next;
 
   public:
-    static auto init()
-  };
+    static auto init(const AVCodecContext &decoder_context,
+                     const AVCodecContext &encoder_context)
+        -> Result<Resampler>;
 
+    Resampler() = default;
+    Resampler(auto &&swr_context);
+
+    Resampler(const Resampler &) = delete;
+    auto operator=(const Resampler &) -> Resampler & = delete;
+
+    Resampler(Resampler &&) = default;
+    auto operator=(Resampler &&) -> Resampler & = default;
+
+    ~Resampler() = default;
+
+    auto setNext(const Next &obj) -> void;
+    auto process(auto&& data) -> void;
+  };
+  
   template <Subscriber Next>
   class Encoder {
     std::thread worker_thread;
+    std::mutex mutex;
+    std::atomic<bool> is_running;
+    std::condition_variable has_data;
+
+    std::unique_ptr<AVCodec> encoder_ptr;
+    std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> encoder_ctx;
+    std::unique_ptr<AVAudioFifo, decltype(_fifoDeleter)> fifo_buffer;
+
+  public:
+    static auto init(AVCodecID id, int sample_rate, AVChannelLayout ch_layout,
+                     AVSampleFormat format, int bit_rate, int std_compliance)
+        -> Result<Encoder>;
+
+    Encoder() = default;
+    Encoder(auto &&enc_ptr, auto &&enc_ctx, auto &&worker_thread);
+
+    Encoder(const Encoder &) = delete;
+    auto operator=(const Encoder &) -> Encoder & = delete;
+
+    Encoder(Encoder &&) = default;
+    auto operator=(Encoder &&) -> Encoder & = default;
+
+    ~Encoder();
+
+    auto start() -> void;
     
     
   };
