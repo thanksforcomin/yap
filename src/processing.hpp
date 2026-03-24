@@ -158,65 +158,13 @@ namespace proc {
 
     ~Encoder();
 
+    
     auto start() -> void;
-    
-    
+    auto setNext(const Next &next) -> void;
+    auto process(auto &&data) -> void;
+
   };
 
-  template <Subscriber... Subscribers> class OpusEncoder {
-    std::unique_ptr<AVCodec> decoder_ptr;
-    std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> decoder_ctx;
-    std::unique_ptr<AVCodec> encoder_ptr;
-    std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> encoder_ctx;
-    std::unique_ptr<SwrContext, decltype(_resamplerDeleter)> swr_context;
-    std::unique_ptr<AVFrame, decltype(_frameDeleter)> frame_in;
-    std::unique_ptr<AVFrame, decltype(_frameDeleter)> frame_out;
-    std::unique_ptr<AVAudioFifo, decltype(_fifoDeleter)> fifo_buffer;
-
-    static int ENCODER_FRAME_SIZE;
-    
-    std::tuple<Subscribers&...> subs;
-
-  public:
-    static auto init(AVCodecParameters *input_params, Subscribers &...subs)
-        -> Result<OpusEncoder>;
-
-    OpusEncoder() = default;
-    OpusEncoder(auto &&encoder_codec, auto &&encoder_context,
-                auto &&decoder_codec, auto &&decoder_context, auto &&resampler,
-                auto &&frame_in, auto &&frame_out,
-                Subscribers &...subs);
-
-    OpusEncoder(const OpusEncoder &other) = delete;
-    auto operator=(const OpusEncoder &other) -> OpusEncoder & = delete;
-
-    OpusEncoder(OpusEncoder &&other) = default;
-    auto operator=(OpusEncoder &&other) -> OpusEncoder & = default;
-
-    ~OpusEncoder() = default;
-
-    auto process(const audio::PacketWrapper &packet) -> void;
-    auto resize_out_frame(int nb_samples) -> void;
-
-  private:
-    static auto pickEncoder(AVCodecID id) -> Result<AVCodec *>;
-    static auto pickDecoder(AVCodecID id) -> Result<AVCodec *>;
-    static auto setUpEncoder(AVCodecParameters *params, AVCodec *codec) 
-        -> Result<AVCodecContext *>;
-    static auto setUpResampler(AVCodecContext *decoder, AVCodecContext *encoder) 
-        -> Result<SwrContext *>;
-    static auto setUpDecoder(AVCodecParameters *params, AVCodec *codec)
-        -> Result<AVCodecContext *>;
-    static auto setUpOutFrame(AVCodecContext *encoder, int max_samples)
-        -> Result<AVFrame *>;
-
-    auto read_from_decoder() -> Result<void>;
-    auto resample_audio() -> Result<void>;
-    auto add_samples_to_fifo() -> Result<void>;
-  };
-
-  template <Subscriber... Subscribers>
-  int OpusEncoder<Subscribers...>::ENCODER_FRAME_SIZE = 960;
 }
 
 #include "processing.ipp"
