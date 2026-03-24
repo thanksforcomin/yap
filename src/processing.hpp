@@ -43,11 +43,15 @@ namespace proc {
   
   template <typename T>
   using Result = std::expected<T, ProcessingError>;
-  
-  struct AudioData;
 
+  struct SimpleCaster {
+    template<typename T> constexpr operator T &();
+
+    template <typename T> constexpr operator T &&();
+  };
+  
   template <typename T>
-  concept Subscriber = requires(T t, AudioData data) {
+  concept Subscriber = requires(T t, SimpleCaster data) {
     { t.process(data) } -> std::same_as<void>;
   };
 
@@ -79,7 +83,7 @@ namespace proc {
     Next *next;
 
   public:
-    static auto init(AVCodecParameters *input_params, Next &next) -> Result<Decoder>;
+    static auto init(AVCodecParameters *input_params) -> Result<Decoder>;
 
     Decoder() = default;
     Decoder(auto &&dec_ptr, auto &&dec_ctx);
@@ -92,7 +96,6 @@ namespace proc {
 
     ~Decoder() = default;
 
-    auto process(const audio::PacketWrapper data) -> void;
     auto getDecoderPtr() const -> const AVCodecContext &;
 
     auto setNext(const Next &obj) -> void;
@@ -101,7 +104,7 @@ namespace proc {
   private:
     static auto pickDecoder(AVCodecID id) -> Result<AVCodec *>;
     static auto setUpDecoder(AVCodecParameters *params, AVCodec *codec)
-        -> Result<AVCodec *>;
+        -> Result<AVCodecContext *>;
   };
 
 
@@ -157,12 +160,18 @@ namespace proc {
     auto operator=(Encoder &&) -> Encoder & = default;
 
     ~Encoder();
-
     
     auto start() -> void;
     auto setNext(const Next &next) -> void;
     auto process(auto &&data) -> void;
 
+  private:
+    static auto pickEncoder(AVCodecID id) -> Result<AVCodec *>;
+    static auto setUpEncoder(AVCodecParameters *params, AVCodec *codec,
+                             int sample_rate, AVChannelLayout ch_layout,
+                             AVSampleFormat format, int bit_rate,
+                             int std_compliance) -> Result<AVCodecContext *>;
+    
   };
 
 }
