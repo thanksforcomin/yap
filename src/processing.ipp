@@ -87,7 +87,7 @@ namespace proc {
       : decoder_ptr(dec_ptr), decoder_ctx(dec_ctx) {}
 
   template <Subscriber Next>
-  auto Decoder<Next>::getDecoderPtr() const -> const AVCodecContext & {
+  auto Decoder<Next>::getDecoderCtx() const -> const AVCodecContext & {
     return *decoder_ctx;
   }
 
@@ -115,8 +115,8 @@ namespace proc {
   }
 
   template <Subscriber Next>
-  auto Encoder<Next>::setUpEncoder(AVCodecParameters *params, AVCodec *codec,
-                                   int sample_rate, AVChannelLayout ch_layout,
+  auto Encoder<Next>::setUpEncoder(AVCodec *codec, int sample_rate,
+                                   AVChannelLayout ch_layout,
                                    AVSampleFormat format, int bit_rate,
                                    int std_compliance)
       -> Result<AVCodecContext *> {
@@ -142,8 +142,121 @@ namespace proc {
     }
 
     return enc_ctx;
-    
   }
+
+  template <Subscriber Next>
+  auto Encoder<Next>::init(AVCodecID id, int sample_rate,
+                           AVChannelLayout ch_layout, AVSampleFormat format,
+                           int bit_rate, int std_compliance)
+      -> Result<Encoder> {
+    auto encoder = pickEncoder(id);
+
+    if (!encoder)
+      return std::unexpected(encoder.error());
+
+    auto encoder_context = setUpEncoder(*encoder, sample_rate, ch_layout,
+                                        format, bit_rate, std_compliance);
+
+    if (!encoder_context)
+      return std::unexpected(encoder_context.error());
+
+    return Encoder(*encoder, *encoder_context);
+  }
+
+  template <Subscriber Next>
+  Encoder<Next>::Encoder(auto &&enc_ptr, auto &&enc_ctx)
+      : encoder_ptr(enc_ptr), encoder_ctx(enc_ctx) {}
+
+  template <Subscriber Next>
+  auto Encoder<Next>::getEncoderCtx() const -> const AVCodecContext & {
+    return *encoder_ctx;
+  }
+
+  template <Subscriber Next> Encoder<Next>::~Encoder() {
+    if (worker_thread.joinable())
+      worker_thread.join();
+  }
+
+  template <Subscriber Next> auto Encoder<Next>::start() -> void {
+    worker_thread = std::thread(&Encoder::workerThread, this);
+  }
+} // namespace proc
+
+namespace proc {
+  template <Subscriber Next>
+  auto Resampler<Next>::setUpResampler(const AVCodecContext *decoder,
+                                       const AVCodecContext *encoder)
+    -> Result<SwrContext *> {
+    SwrContext *swr = swr_alloc();
+    
+    if (!swr) {
+      utils::report_error("Could not allocate resampler context");
+      return std::unexpected(ResamplerNotAllocated);
+    }
+    
+    int ret = swr_alloc_set_opts2(&swr,
+                                  &encoder->ch_layout, encoder->sample_fmt, encoder->sample_rate,
+                                  &decoder->ch_layout, decoder->sample_fmt, decoder->sample_rate,
+                                  0, nullptr);
+    if (ret < 0) {
+      swr_free(&swr);
+      utils::report_error("Could not set resampler options");
+      return std::unexpected(ResamplerNotAllocated);
+    }
+    
+    if (auto ret = swr_init(swr); ret < 0) {
+      utils::report_error("Could not initialize resampler context");
+
+      if (swr)
+        swr_free(&swr);
+      
+      return std::unexpected(ResamplerNotAllocated);
+    }
+    
+    return swr;
+  }
+
+  template <Subscriber Next>
+  auto Resampler<Next>::setUpOutFrame(const AVCodecContext *encoder, int max_samples)
+      -> Result<AVFrame *> {
+    auto out_frame = av_frame_alloc();
+
+    out_frame->format = encoder->sample_fmt;
+    out_frame->ch_layout = encoder->ch_layout;
+    out_frame->sample_rate = encoder->sample_rate;
+    out_frame->nb_samples = max_samples;
+
+    if (auto ret = av_frame_get_buffer(out_frame, 0); ret < 0) {
+      utils::report_error(ret, "Issues with frame buffer allocation");
+      av_frame_unref(out_frame);
+
+      return std::unexpected(FrameAllocationFault);
+    }
+
+    return out_frame;
+  }
+
+  template <Subscriber Next>
+  auto Resampler<Next>::init(const AVCodecContext &decoder_context,
+                             const AVCodecContext &encoder_context)
+      -> Result<Resampler> {
+    auto resampler = setUpResampler(&decoder_context, &encoder_context);
+
+    if (!resampler)
+      return std::unexpected(ResamplerNotAllocated);
+
+    auto frame = setUpOutFrame(&encoder_context, 960);
+
+    if (!frame)
+      return std::unexpected(ResamplerNotAllocated);
+
+    return Resampler(*resampler, *frame);
+  }
+
+  template <Subscriber Next>
+  Resampler<Next>::Resampler(auto &&swr_context, auto &&frame_out)
+      : swr_context(swr_context), out_frame(frame_out) {}
+  
 }
 
 

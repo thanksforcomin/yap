@@ -96,7 +96,7 @@ namespace proc {
 
     ~Decoder() = default;
 
-    auto getDecoderPtr() const -> const AVCodecContext &;
+    auto getDecoderCtx() const -> const AVCodecContext &;
 
     auto setNext(const Next &obj) -> void;
     auto process(auto&& data) -> void;
@@ -107,10 +107,10 @@ namespace proc {
         -> Result<AVCodecContext *>;
   };
 
-
   template <Subscriber Next>
   class Resampler {
     std::unique_ptr<SwrContext, decltype(_resamplerDeleter)> swr_context;
+    std::unique_ptr<AVFrame, decltype(_frameDeleter)> out_frame;
 
     Next *next;
 
@@ -120,7 +120,7 @@ namespace proc {
         -> Result<Resampler>;
 
     Resampler() = default;
-    Resampler(auto &&swr_context);
+    Resampler(auto &&swr_context, auto &&frame_out);
 
     Resampler(const Resampler &) = delete;
     auto operator=(const Resampler &) -> Resampler & = delete;
@@ -131,7 +131,13 @@ namespace proc {
     ~Resampler() = default;
 
     auto setNext(const Next &obj) -> void;
-    auto process(auto&& data) -> void;
+    auto process(auto &&data) -> void;
+
+  private:
+    static auto setUpResampler(const AVCodecContext *decoder, const AVCodecContext *encoder)
+        -> Result<SwrContext *>;
+    static auto setUpOutFrame(const AVCodecContext *encoder, int max_samples)
+        -> Result<AVFrame *>;
   };
   
   template <Subscriber Next>
@@ -151,7 +157,7 @@ namespace proc {
         -> Result<Encoder>;
 
     Encoder() = default;
-    Encoder(auto &&enc_ptr, auto &&enc_ctx, auto &&worker_thread);
+    Encoder(auto &&enc_ptr, auto &&enc_ctx);
 
     Encoder(const Encoder &) = delete;
     auto operator=(const Encoder &) -> Encoder & = delete;
@@ -160,18 +166,21 @@ namespace proc {
     auto operator=(Encoder &&) -> Encoder & = default;
 
     ~Encoder();
+
+    auto getEncoderCtx() const -> const AVCodecContext &;
     
     auto start() -> void;
     auto setNext(const Next &next) -> void;
     auto process(auto &&data) -> void;
 
   private:
-    static auto pickEncoder(AVCodecID id) -> Result<AVCodec *>;
-    static auto setUpEncoder(AVCodecParameters *params, AVCodec *codec,
-                             int sample_rate, AVChannelLayout ch_layout,
-                             AVSampleFormat format, int bit_rate,
-                             int std_compliance) -> Result<AVCodecContext *>;
+    auto workerThread() -> void;
     
+    static auto pickEncoder(AVCodecID id) -> Result<AVCodec *>;
+    static auto setUpEncoder(AVCodec *codec, int sample_rate,
+                             AVChannelLayout ch_layout, AVSampleFormat format,
+                             int bit_rate, int std_compliance)
+        -> Result<AVCodecContext *>;
   };
 
 }
