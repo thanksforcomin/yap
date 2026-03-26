@@ -75,12 +75,9 @@ namespace proc {
       av_audio_fifo_free(fifo);
   };
 
-  template<Subscriber Next>
   class Decoder {
     std::unique_ptr<AVCodec> decoder_ptr;
     std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> decoder_ctx;
-
-    Next *next;
 
   public:
     static auto init(AVCodecParameters *input_params) -> Result<Decoder>;
@@ -98,8 +95,7 @@ namespace proc {
 
     auto getDecoderCtx() const -> const AVCodecContext &;
 
-    auto setNext(const Next &obj) -> void;
-    auto process(auto&& data) -> void;
+    auto process(auto&& data);
 
   private:
     static auto pickDecoder(AVCodecID id) -> Result<AVCodec *>;
@@ -107,12 +103,9 @@ namespace proc {
         -> Result<AVCodecContext *>;
   };
 
-  template <Subscriber Next>
   class Resampler {
     std::unique_ptr<SwrContext, decltype(_resamplerDeleter)> swr_context;
     std::unique_ptr<AVFrame, decltype(_frameDeleter)> out_frame;
-
-    Next *next;
 
   public:
     static auto init(const AVCodecContext &decoder_context,
@@ -130,7 +123,6 @@ namespace proc {
 
     ~Resampler() = default;
 
-    auto setNext(const Next &obj) -> void;
     auto process(auto &&data) -> void;
 
   private:
@@ -140,7 +132,6 @@ namespace proc {
         -> Result<AVFrame *>;
   };
   
-  template <Subscriber Next>
   class Encoder {
     std::thread worker_thread;
     std::mutex mutex;
@@ -170,8 +161,7 @@ namespace proc {
     auto getEncoderCtx() const -> const AVCodecContext &;
     
     auto start() -> void;
-    auto setNext(const Next &next) -> void;
-    auto process(auto &&data) -> void;
+    auto process(auto &&data);
 
   private:
     auto workerThread() -> void;
@@ -183,6 +173,11 @@ namespace proc {
         -> Result<AVCodecContext *>;
   };
 
+  class OpusEncoder {
+    
+    
+  };
+  
 }
 
 #include "processing.ipp"
