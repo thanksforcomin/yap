@@ -42,29 +42,21 @@ namespace audio {
     ~PacketWrapper();
   };
 
-  template <typename T>
-  concept AudioSubscriber = requires(T t, PacketWrapper packet) {
-    { t.process(packet) } -> std::same_as<void>;
-  };
-
   inline constexpr auto _formatContextDeleter = [](AVFormatContext *ctx) {
     if (ctx)
       avformat_close_input(&ctx);
   };
   
-  template <AudioSubscriber... Subscribers> class AudioInput {
-    std::tuple<Subscribers&...> subscribers;
-
+  class AudioInput {
+    
     int32_t audio_index;
     std::unique_ptr<AVFormatContext, decltype(_formatContextDeleter)>
         fmt_ctx_ptr;
 
   public:
-    static auto init(auto &&options, auto &&device_url, auto &&input_format_name,
-                     Subscribers &...subscribers) -> Result<AudioInput>;
+    static auto init(auto &&options, auto &&device_url, auto &&input_format_name) -> Result<AudioInput>;
     
-    AudioInput(auto&& format_context, auto&& audio_index,
-               Subscribers &...subscribers);
+    AudioInput(auto&& format_context, auto&& audio_index);
 
     AudioInput(const AudioInput &) = delete;
     auto operator=(const AudioInput &) -> AudioInput & = delete;
@@ -74,7 +66,7 @@ namespace audio {
 
     ~AudioInput() = default;
 
-    auto run() -> void;
+    auto process() -> Result<PacketWrapper>;
 
     auto getCodecParams() const -> AVCodecParameters*;
 
@@ -92,19 +84,18 @@ namespace audio {
   };
   
   // NOLINTNEXTLINE
-  template <AudioSubscriber... Subscribers> struct AudioInputBuilder {
+  struct AudioInputBuilder {
     std::unique_ptr<AVDictionary, decltype(_avDictionaryDeleter)> options;
-    std::tuple<Subscribers&...> subs;
     std::string_view device_url;
     std::string_view input_format;
 
-    AudioInputBuilder(Subscribers&... subscribers);
+    AudioInputBuilder() = default;
     ~AudioInputBuilder() = default;
 
     auto setOption(auto &&key, auto &&value) -> AudioInputBuilder &;
     auto setDeviceUrl(auto &&value) -> AudioInputBuilder &;
     auto setInputFormat(auto&& value) -> AudioInputBuilder &;
-    auto build() -> Result<AudioInput<Subscribers...>>;
+    auto build() -> Result<AudioInput>;
   };
 }
 

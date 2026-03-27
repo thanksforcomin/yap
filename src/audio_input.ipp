@@ -9,10 +9,8 @@
 #include <utility>
 
 namespace audio {
-  template <AudioSubscriber... Subscribers>
-  auto AudioInput<Subscribers...>::init(auto &&options, auto &&device_url,
-                                        auto &&input_format_name,
-                                        Subscribers &...subscribers)
+  auto AudioInput::init(auto &&options, auto &&device_url,
+                                        auto &&input_format_name)
     -> Result<AudioInput> {
     auto format_context = makeInput(options, device_url, input_format_name);
     if (!format_context) 
@@ -22,21 +20,16 @@ namespace audio {
     if (!audio_index)
       return std::unexpected(audio_index.error());
 
-    return AudioInput(*format_context, *audio_index,
-                      subscribers...);
+    return AudioInput(*format_context, *audio_index);
   }
 
-  template <AudioSubscriber... Subscribers>
-  AudioInput<Subscribers...>::AudioInput(auto &&format_context,
-                                         auto &&audio_index,
-                                         Subscribers &...subscribers)
-      : subscribers(std::tie(subscribers...)), audio_index(audio_index),
+  AudioInput::AudioInput(auto &&format_context, auto &&audio_index)
+      : audio_index(audio_index),
         fmt_ctx_ptr(std::forward<decltype(format_context)>(format_context)) {}
-  
-  template <AudioSubscriber... Subscribers>
-  auto AudioInput<Subscribers...>::makeInput(
-                                             AVDictionary *options, utils::formattable auto &&device_url,
-      utils::formattable auto &&input_format_name)
+
+  auto AudioInput::makeInput(AVDictionary *options,
+                             utils::formattable auto &&device_url,
+                             utils::formattable auto &&input_format_name)
     -> Result<AVFormatContext *> {
     AVInputFormat *input_format =
       const_cast<AVInputFormat *>(av_find_input_format(input_format_name));
@@ -61,8 +54,7 @@ namespace audio {
     return fmt_context;
   }
 
-  template <AudioSubscriber... Subscribers>
-  auto AudioInput<Subscribers...>::getAudioStream(auto&& format_ctx) -> Result<int> {
+  auto AudioInput::getAudioStream(auto&& format_ctx) -> Result<int> {
     int audio_stream_index = -1;
     
     if (auto ret = avformat_find_stream_info(format_ctx, nullptr);
@@ -86,43 +78,13 @@ namespace audio {
     return audio_stream_index;
   }
 
-  template <AudioSubscriber... Subscribers>
-  auto AudioInput<Subscribers...>::run() -> void {
-    std::println("Capturing audio... Press Ctrl+C to abort");
-
-    PacketWrapper pack;
-
-    while (true) {
-      if (auto ret = av_read_frame(fmt_ctx_ptr.get(), pack.pack); ret < 0) {
-        if (ret == AVERROR_EOF || ret == AVERROR(EAGAIN))
-          break;
-
-        utils::report_error(ret, "Error reading frame: ");
-        break;
-      }
-
-      if (pack.pack->stream_index == audio_index) {
-        std::apply([&](Subscribers&... subs) {
-          (subs.process(pack),...);
-    
-        }, subscribers);
-      }
-    }
-  }
-
-  template <AudioSubscriber... Subscribers>
-  auto AudioInput<Subscribers...>::getCodecParams() const
+  auto AudioInput::getCodecParams() const
       -> AVCodecParameters * {
     return fmt_ctx_ptr->streams[audio_index]->codecpar;
   }
 
-  template <AudioSubscriber... Subscribers>
-  AudioInputBuilder<Subscribers...>::AudioInputBuilder(
-      Subscribers &...subscribers)
-    : options(), subs(std::tie(subscribers...)) {}
 
-  template <AudioSubscriber... Subscribers>
-  auto AudioInputBuilder<Subscribers...>::setOption(auto &&key, auto &&value)
+  auto AudioInputBuilder::setOption(auto &&key, auto &&value)
       -> AudioInputBuilder & {
     auto opts = options.get();
     av_dict_set(&opts, key, value, 0);
@@ -130,28 +92,21 @@ namespace audio {
     return *this;
   }
 
-  template <AudioSubscriber... Subscribers>
-  auto AudioInputBuilder<Subscribers...>::setDeviceUrl(auto &&value)
+  auto AudioInputBuilder::setDeviceUrl(auto &&value)
       -> AudioInputBuilder & {
     device_url = value;
     
     return *this;
   }
   
-  template <AudioSubscriber... Subscribers>
-  auto AudioInputBuilder<Subscribers...>::setInputFormat(auto &&value)
+  auto AudioInputBuilder::setInputFormat(auto &&value)
       -> AudioInputBuilder & {
     input_format = value;
     
     return *this;
   }
-  
-  template <AudioSubscriber... Subscribers>
-  auto AudioInputBuilder<Subscribers...>::build()
-    -> Result<AudioInput<Subscribers...>> {
-    return std::apply([&](Subscribers &...subscribers) {
-      return AudioInput<Subscribers...>::init(options.get(), device_url.data(), input_format.data(),
-                        subscribers...);
-    }, subs);
+
+  auto AudioInputBuilder::build() -> Result<AudioInput> {
+    return AudioInput::init(options, device_url, input_format);
   }
 }
