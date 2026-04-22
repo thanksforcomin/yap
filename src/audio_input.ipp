@@ -13,10 +13,12 @@ namespace audio {
                                         auto &&input_format_name)
     -> Result<AudioInput> {
     auto format_context = makeInput(options, device_url, input_format_name);
+    
     if (!format_context) 
       return std::unexpected(format_context.error());
 
     auto audio_index = getAudioStream(*format_context);
+    
     if (!audio_index)
       return std::unexpected(audio_index.error());
 
@@ -107,6 +109,6 @@ namespace audio {
   }
 
   auto AudioInputBuilder::build() -> Result<AudioInput> {
-    return AudioInput::init(options, device_url, input_format);
+    return AudioInput::init(options.get(), device_url.data(), input_format.data());
   }
 }

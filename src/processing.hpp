@@ -133,11 +133,6 @@ namespace proc {
   };
   
   class Encoder {
-    std::thread worker_thread;
-    std::mutex mutex;
-    std::atomic<bool> is_running;
-    std::condition_variable has_data;
-
     std::unique_ptr<AVCodec> encoder_ptr;
     std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> encoder_ctx;
     std::unique_ptr<AVAudioFifo, decltype(_fifoDeleter)> fifo_buffer;

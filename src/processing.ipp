@@ -123,7 +123,7 @@ namespace proc {
     if (!encoder_context)
       return std::unexpected(encoder_context.error());
     
-    return Encoder(*encoder, *encoder_context);
+    return Encoder(std::move(*encoder), std::move(*encoder_context));
   }
   
   Encoder::Encoder(auto &&enc_ptr, auto &&enc_ctx)
@@ -134,20 +134,6 @@ namespace proc {
   }
   
   Encoder::~Encoder() {
-    if (worker_thread.joinable())
-      worker_thread.join();
-}
-  
-  auto Encoder::start() -> void {
-    worker_thread = std::thread(&Encoder::workerThread, this);
-  }
-
-  auto Encoder::process(auto &&data) {
-    // Implementation that forwards data to the worker thread
-  }
-  
-  auto Encoder::workerThread() -> void {
-    // Thread function
   }
 } // namespace proc
 

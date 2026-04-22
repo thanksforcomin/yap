@@ -18,30 +18,11 @@ extern "C" {
 #include <libavutil/dict.h>
 #include <libavutil/error.h>
 }
-
-struct PrimitiveLogger {
-  void process(const audio::PacketWrapper &wrappa) {
-    std::println("Received audio packet of size {}", wrappa.pack->size);
-  }
-
-  PrimitiveLogger() = default;
-
-  PrimitiveLogger(const PrimitiveLogger &other) = delete;
-  PrimitiveLogger(PrimitiveLogger &&other) = delete;
-  auto operator=(const PrimitiveLogger &other) -> PrimitiveLogger& = delete;
-  auto operator=(PrimitiveLogger &&other) -> PrimitiveLogger & = delete;
-
-  ~PrimitiveLogger() = default;
-};
-
 int main() {
-  PrimitiveLogger logger;
-
-  
   avdevice_register_all();
   avformat_network_init();
 
-  auto audio_input_ = audio::AudioInputBuilder(logger)
+  auto audio_input_ = audio::AudioInputBuilder()
                           .setInputFormat("pulse")
                           .setDeviceUrl("default")
                           .build();
@@ -52,7 +33,5 @@ int main() {
   }
 
   auto audio_input = std::move(*audio_input_);
-
-  audio_input.run();
 };
  
