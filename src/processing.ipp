@@ -21,7 +21,7 @@ extern "C" {
 #include <iostream>
 #include "processing.hpp"
 
-namespace proc {
+namespace audio {
   auto Decoder::pickDecoder(AVCodecID id) -> Result<AVCodec *> {
     AVCodec *codec = const_cast<AVCodec *>(avcodec_find_decoder(id));
     if (!codec) {
@@ -77,7 +77,7 @@ namespace proc {
   }
 } // namespace proc
 
-namespace proc {
+namespace audio {
   auto Encoder::pickEncoder(AVCodecID id) -> Result<AVCodec *> {
     AVCodec *codec = const_cast<AVCodec *>(avcodec_find_encoder(id));
     if (!codec) {
@@ -137,7 +137,7 @@ namespace proc {
   }
 } // namespace proc
 
-namespace proc {
+namespace audio {
   auto Resampler::setUpResampler(const AVCodecContext *decoder,
                                  const AVCodecContext *encoder)
     -> Result<SwrContext *> {

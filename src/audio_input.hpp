@@ -10,6 +10,7 @@ extern "C" {
 }
 
 #include "src/utils.hpp"
+#include "src/errors.hpp"
 #include <expected>
 #include <memory>
 #include <mutex>
@@ -18,26 +19,18 @@ extern "C" {
 
 namespace audio {
 
-  enum Errors {
-    UnknownInputFormat,
-    FailedToOpenDevice,
-    CannotFindStreamInfo,
-    NoAudioStreamFound
-  };
+  using namespace errors;
   
-  template <typename T>
-  using Result = std::expected<T, Errors>;
-
   struct PacketWrapper {
     AVPacket *pack;
 
-    PacketWrapper();
+    PacketWrapper() noexcept;
 
     PacketWrapper(const PacketWrapper &other) = delete;
     auto operator=(const PacketWrapper &other) -> PacketWrapper & = delete;
 
-    PacketWrapper(PacketWrapper &&other) = default; 
-    auto operator=(PacketWrapper &&other) -> PacketWrapper & = default;
+    PacketWrapper(PacketWrapper &&other) noexcept ; 
+    auto operator=(PacketWrapper &&other) noexcept -> PacketWrapper & ;
     
     ~PacketWrapper();
   };

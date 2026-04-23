@@ -27,22 +27,23 @@ extern "C" {
 #include <tuple>
 #include <unordered_map>
 
-namespace proc {
+namespace audio {
 
-  enum ProcessingError {
-    ResamplingError,
-    EncoderNotFound,
-    EncoderNotAllocated,
-    EncoderNotOpen,
-    DecoderNotAllocated,
-    DecoderNotOpen,
-    ResamplerNotAllocated,
-    FrameAllocationFault,
-    AudioArrayError
+  using namespace errors;
+
+  struct FrameWrapper {
+    AVFrame *frame;
+
+    FrameWrapper() noexcept;
+
+    FrameWrapper(const FrameWrapper &other) = delete;
+    auto operator=(const FrameWrapper &other) -> FrameWrapper & = delete;
+
+    FrameWrapper(FrameWrapper &&other) noexcept;
+    auto operator=(FrameWrapper &&other) noexcept -> FrameWrapper &;
+    
+    ~FrameWrapper();
   };
-  
-  template <typename T>
-  using Result = std::expected<T, ProcessingError>;
 
   struct SimpleCaster {
     template<typename T> constexpr operator T &();
