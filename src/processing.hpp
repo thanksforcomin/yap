@@ -168,12 +168,5 @@ namespace audio {
                              int bit_rate, int std_compliance)
         -> Result<AVCodecContext *>;
   };
-
-  class OpusEncoder {
-    
-    
-  };
   
 }
-
-#include "processing.ipp"
