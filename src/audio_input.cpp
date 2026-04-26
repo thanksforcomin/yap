@@ -1,4 +1,5 @@
 #include "audio_input.hpp"
+#include "audio_input.ipp"
 #include "src/utils.hpp"
 #include <libavcodec/packet.h>
 

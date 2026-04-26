@@ -91,5 +91,3 @@ namespace audio {
     auto build() -> Result<AudioInput>;
   };
 }
-
-#include "audio_input.ipp"
