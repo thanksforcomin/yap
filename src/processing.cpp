@@ -1,10 +1,6 @@
 #include "src/processing.hpp"
 #include "src/utils.hpp"
 
-#include "src/decoder.ipp"
-#include "src/encoder.ipp"
-#include "src/resampler.ipp"
-
 #include <libavutil/samplefmt.h>
 
 namespace audio {

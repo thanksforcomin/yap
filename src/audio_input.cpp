@@ -1,7 +1,5 @@
-#include "audio_input.hpp"
-#include "audio_input.ipp"
+#include "src/audio_input.hpp"
 #include "src/utils.hpp"
-#include <libavcodec/packet.h>
 
 namespace audio {
   PacketWrapper::PacketWrapper() noexcept : pack(av_packet_alloc())  {

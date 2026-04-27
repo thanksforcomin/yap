@@ -77,7 +77,7 @@ namespace audio {
   };
 
   class Decoder {
-    std::unique_ptr<AVCodec> decoder_ptr;
+    const AVCodec* decoder_ptr = nullptr;
     std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> decoder_ctx;
 
   public:
@@ -134,7 +134,7 @@ namespace audio {
   };
   
   class Encoder {
-    std::unique_ptr<AVCodec> encoder_ptr;
+    const AVCodec* encoder_ptr = nullptr;
     std::unique_ptr<AVCodecContext, decltype(_codecContextDeleter)> encoder_ctx;
     std::unique_ptr<AVAudioFifo, decltype(_fifoDeleter)> fifo_buffer;
 
@@ -152,7 +152,7 @@ namespace audio {
     Encoder(Encoder &&) = default;
     auto operator=(Encoder &&) -> Encoder & = default;
 
-    ~Encoder();
+    ~Encoder() = default;
 
     auto getEncoderCtx() const -> const AVCodecContext &;
     
@@ -170,3 +170,7 @@ namespace audio {
   };
   
 }
+
+#include "src/decoder.ipp"
+#include "src/encoder.ipp"
+#include "src/resampler.ipp"

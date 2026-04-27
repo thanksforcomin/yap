@@ -1,7 +1,6 @@
 #pragma once
 
-#include <libavutil/frame.h>
-#include <print>
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavcodec/codec_id.h>
@@ -13,6 +12,7 @@ extern "C" {
 #include <libswresample/swresample.h>
 #include <libavcodec/defs.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/frame.h>
 }
 
 #include "src/audio_input.hpp"
@@ -22,7 +22,7 @@ extern "C" {
 #include "processing.hpp"
 
 namespace audio {
-  auto Encoder::pickEncoder(AVCodecID id) -> Result<AVCodec *> {
+  inline auto Encoder::pickEncoder(AVCodecID id) -> Result<AVCodec *> {
     AVCodec *codec = const_cast<AVCodec *>(avcodec_find_encoder(id));
     if (!codec) {
       utils::report_error("Could not find encoder");
@@ -31,7 +31,7 @@ namespace audio {
     return codec;
   }
   
-  auto Encoder::setUpEncoder(AVCodec *codec, int sample_rate,
+  inline auto Encoder::setUpEncoder(AVCodec *codec, int sample_rate,
                              AVChannelLayout ch_layout, AVSampleFormat format,
                              int bit_rate, int std_compliance)
     -> Result<AVCodecContext *> {
@@ -54,7 +54,7 @@ namespace audio {
     return enc_ctx;
   }
   
-  auto Encoder::init(AVCodecID id, int sample_rate,
+  inline auto Encoder::init(AVCodecID id, int sample_rate,
                      AVChannelLayout ch_layout, AVSampleFormat format,
                      int bit_rate, int std_compliance)
     -> Result<Encoder> {
@@ -73,10 +73,7 @@ namespace audio {
   Encoder::Encoder(auto &&enc_ptr, auto &&enc_ctx)
     : encoder_ptr(enc_ptr), encoder_ctx(enc_ctx) {}
   
-  auto Encoder::getEncoderCtx() const -> const AVCodecContext & {
+  inline auto Encoder::getEncoderCtx() const -> const AVCodecContext & {
     return *encoder_ctx;
-  }
-  
-  Encoder::~Encoder() {
   }
 } // namespace proc

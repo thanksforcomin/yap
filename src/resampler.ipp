@@ -24,7 +24,7 @@ extern "C" {
 
 
 namespace audio {
-  auto Resampler::setUpResampler(const AVCodecContext *decoder,
+  inline auto Resampler::setUpResampler(const AVCodecContext *decoder,
                                  const AVCodecContext *encoder)
     -> Result<SwrContext *> {
     SwrContext *swr = swr_alloc();
@@ -50,7 +50,7 @@ namespace audio {
     return swr;
   }
   
-  auto Resampler::setUpOutFrame(const AVCodecContext *encoder, int max_samples)
+  inline auto Resampler::setUpOutFrame(const AVCodecContext *encoder, int max_samples)
     -> Result<AVFrame *> {
     auto out_frame = av_frame_alloc();
     out_frame->format = encoder->sample_fmt;
@@ -66,7 +66,7 @@ namespace audio {
     return out_frame;
   }
   
-  auto Resampler::init(const AVCodecContext &decoder_context,
+  inline auto Resampler::init(const AVCodecContext &decoder_context,
                        const AVCodecContext &encoder_context)
     -> Result<Resampler> {
     auto resampler = setUpResampler(&decoder_context, &encoder_context);
@@ -83,7 +83,7 @@ namespace audio {
   Resampler::Resampler(auto &&swr_context, auto &&frame_out)
     : swr_context(swr_context), out_frame(frame_out) {}
   
-  auto Resampler::process(auto &&data) -> void {
+  inline auto Resampler::process(auto &&data) -> void {
     // Implementation that calls next->process(...)
   }
 }

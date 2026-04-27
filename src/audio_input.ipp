@@ -9,7 +9,7 @@
 #include <utility>
 
 namespace audio {
-  auto AudioInput::init(auto &&options, auto &&device_url,
+  inline auto AudioInput::init(auto &&options, auto &&device_url,
                                         auto &&input_format_name)
     -> Result<AudioInput> {
     auto format_context = makeInput(options, device_url, input_format_name);
@@ -29,7 +29,7 @@ namespace audio {
       : audio_index(audio_index),
         fmt_ctx_ptr(std::forward<decltype(format_context)>(format_context)) {}
 
-  auto AudioInput::makeInput(AVDictionary *options,
+  inline auto AudioInput::makeInput(AVDictionary *options,
                              utils::formattable auto &&device_url,
                              utils::formattable auto &&input_format_name)
     -> Result<AVFormatContext *> {
@@ -56,7 +56,7 @@ namespace audio {
     return fmt_context;
   }
 
-  auto AudioInput::getAudioStream(auto&& format_ctx) -> Result<int> {
+  inline auto AudioInput::getAudioStream(auto&& format_ctx) -> Result<int> {
     int audio_stream_index = -1;
     
     if (auto ret = avformat_find_stream_info(format_ctx, nullptr);
@@ -80,13 +80,13 @@ namespace audio {
     return audio_stream_index;
   }
 
-  auto AudioInput::getCodecParams() const
+  inline auto AudioInput::getCodecParams() const
       -> AVCodecParameters * {
     return fmt_ctx_ptr->streams[audio_index]->codecpar;
   }
 
 
-  auto AudioInputBuilder::setOption(auto &&key, auto &&value)
+  inline auto AudioInputBuilder::setOption(auto &&key, auto &&value)
       -> AudioInputBuilder & {
     auto opts = options.get();
     av_dict_set(&opts, key, value, 0);
@@ -94,21 +94,21 @@ namespace audio {
     return *this;
   }
 
-  auto AudioInputBuilder::setDeviceUrl(auto &&value)
+  inline auto AudioInputBuilder::setDeviceUrl(auto &&value)
       -> AudioInputBuilder & {
     device_url = value;
     
     return *this;
   }
   
-  auto AudioInputBuilder::setInputFormat(auto &&value)
+  inline auto AudioInputBuilder::setInputFormat(auto &&value)
       -> AudioInputBuilder & {
     input_format = value;
     
     return *this;
   }
 
-  auto AudioInputBuilder::build() -> Result<AudioInput> {
+  inline auto AudioInputBuilder::build() -> Result<AudioInput> {
     return AudioInput::init(options.get(), device_url.data(), input_format.data());
   }
 }

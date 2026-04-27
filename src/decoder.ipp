@@ -23,7 +23,7 @@ extern "C" {
 #include "processing.hpp"
 
 namespace audio {
-  auto Decoder::pickDecoder(AVCodecID id) -> Result<AVCodec *> {
+  inline auto Decoder::pickDecoder(AVCodecID id) -> Result<AVCodec *> {
     AVCodec *codec = const_cast<AVCodec *>(avcodec_find_decoder(id));
     if (!codec) {
       utils::report_error("Could not find decoder");
@@ -32,7 +32,7 @@ namespace audio {
     return codec;
   }
   
-  auto Decoder::setUpDecoder(AVCodecParameters *params, AVCodec *codec)
+  inline auto Decoder::setUpDecoder(AVCodecParameters *params, AVCodec *codec)
     -> Result<AVCodecContext *> {
     AVCodecContext *dec_ctx = avcodec_alloc_context3(codec);
     if (!dec_ctx) {
@@ -54,7 +54,7 @@ namespace audio {
     return dec_ctx;
   }
   
-  auto Decoder::init(AVCodecParameters *input_params) -> Result<Decoder> {
+  inline auto Decoder::init(AVCodecParameters *input_params) -> Result<Decoder> {
     auto decoder = pickDecoder(input_params->codec_id);
     if (!decoder)
       return std::unexpected(decoder.error());
@@ -69,11 +69,11 @@ namespace audio {
   Decoder::Decoder(auto &&dec_ptr, auto &&dec_ctx)
     : decoder_ptr(dec_ptr), decoder_ctx(dec_ctx) {}
   
-  auto Decoder::getDecoderCtx() const -> const AVCodecContext & {
+  inline auto Decoder::getDecoderCtx() const -> const AVCodecContext & {
     return *decoder_ctx;
   }
   
-  auto Decoder::process(auto &&data) {
+  inline auto Decoder::process(auto &&data) {
     // Implementation that calls next->process(...) when ready
   }
 } // namespace proc
