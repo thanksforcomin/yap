@@ -42,7 +42,6 @@ namespace audio {
   };
   
   class AudioInput {
-    
     int32_t audio_index;
     std::unique_ptr<AVFormatContext, decltype(_formatContextDeleter)>
         fmt_ctx_ptr;

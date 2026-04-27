@@ -23,7 +23,7 @@ namespace audio {
       return std::unexpected(audio_index.error());
 
     return AudioInput(*format_context, *audio_index);
-  }
+  }     
 
   AudioInput::AudioInput(auto &&format_context, auto &&audio_index)
       : audio_index(audio_index),

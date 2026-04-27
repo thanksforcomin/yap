@@ -1,6 +1,7 @@
 #pragma once
 
 #include "capture_thread.hpp"
+#include "src/audio_input.hpp"
 
 namespace audio {
   inline auto InputWorker::init(auto&& encoder_context) noexcept -> Result<InputWorker> {
@@ -41,5 +42,54 @@ namespace audio {
     : audio_input(std::forward(audio_input)), decoder(std::forward(decoder)),
       resampler(std::forward(resampler)) {}
 
-  
+  inline auto InputWorker::subscribe(auto &&f) -> Result<void> {
+    subscriber = f;
+
+    return {};
+  }
+
+  InputWorker::InputWorker(InputWorker &&other) noexcept
+      : worker_thread(std::move(other.worker_thread)),
+        subscriber(std::move(other.subscriber)),
+        is_running(other.is_running.load()),
+        audio_input(std::move(other.audio_input)),
+        decoder(std::move(other.decoder)),
+        resampler(std::move(other.resampler)) {}
+
+  auto InputWorker::operator=(InputWorker &&other) noexcept -> InputWorker & {
+    if (this == &other)
+      return *this;
+
+    if (is_running.load()) {
+      is_running.store(false);
+
+      if (worker_thread.joinable())
+        worker_thread.join();
+    }
+
+    
+    worker_thread = std::move(other.worker_thread);
+    subscriber    = std::move(other.subscriber);
+    is_running.store(other.is_running.load());
+    audio_input   = std::move(other.audio_input);
+    decoder       = std::move(other.decoder);
+    resampler     = std::move(other.resampler);
+    
+    other.is_running.store(false);
+    
+    return *this;
+  }
+
+  InputWorker::~InputWorker() {
+    if (is_running.load()) {
+      if (worker_thread.joinable())
+        worker_thread.join();
+    }
+  }
+
+  inline auto InputWorker::run() -> Result<void> {
+    worker_thread = std::thread(&InputWorker::worker_function, this);
+    
+    return {};
+  }
 }
