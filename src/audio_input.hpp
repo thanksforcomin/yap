@@ -1,5 +1,6 @@
 #pragma once
 
+#include <type_traits>
 extern "C" {
 #include <libavdevice/avdevice.h>
 #include <libavformat/avformat.h>
@@ -35,7 +36,7 @@ namespace audio {
     ~PacketWrapper();
   };
 
-  inline constexpr auto _formatContextDeleter = [](AVFormatContext *ctx) {
+  inline auto _formatContextDeleter = [](AVFormatContext *ctx) {
     if (ctx)
       avformat_close_input(&ctx);
   };

@@ -26,12 +26,12 @@ int main() {
                           .setInputFormat("pulse")
                           .setDeviceUrl("default")
                           .build();
+  
 
   if (!audio_input_) {
     utils::report_error("Something went wrong when creating audio device");
     return 1;
   }
-
   auto audio_input = std::move(*audio_input_);
 
   auto decoder_ = audio::Decoder::init(audio_input.getCodecParams());
@@ -39,5 +39,9 @@ int main() {
     utils::report_error("Something went wrong when creating decoder");
     return 1;
   }
+  auto decoder = std::move(*decoder_);
+
+  
+  
 };
  
